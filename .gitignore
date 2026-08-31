@@ -1,0 +1,15 @@
+# Hatcheck
+hatcheck
+hatcheck-server
+/objects/
+/metadata/
+
+# VS Code
+.vscode/
+*.code-workspace
+.markdownlint.json
+
+# Environment files
+.env
+.env.*
+!.env.example
