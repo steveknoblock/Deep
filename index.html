@@ -1,0 +1,3135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hatcheck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="http://fonts.googleapis.com/css?family=Lato|Lora|Inconsolata" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:          #eeeeee;
+            --surface:     #e4e4e4;
+            --surface2:    #d8d8d8;
+            --border:      #cccccc;
+            --accent:      #3377aa;
+            --accent-dim:  #255580;
+            --text:        #000000;
+            --text-dim:    #666666;
+            --text-muted:  #999999;
+            --danger:      #cc3333;
+            --collection:  #2277bb;
+            --relation:    #996622;
+            --mono:        'Inconsolata', monospace;
+            --sans:        'Lato', sans-serif;
+            --serif:       'Lora', serif;
+        }
+
+        html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; }
+
+        /* ── Header ── */
+        header {
+            height: 48px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        header h1 {
+            font-family: var(--serif);
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0px;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .ns-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .ns-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .ns-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 11px;
+            padding: 4px 7px;
+            outline: none;
+            transition: border-color 0.15s;
+            min-width: 0;
+        }
+
+        .ns-input:focus { border-color: var(--accent); }
+
+        .ns-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-top: none;
+            z-index: 100;
+            display: none;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .ns-dropdown.visible { display: block; }
+
+        .ns-option {
+            padding: 6px 10px;
+            font-size: 11px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .ns-option:hover, .ns-option.selected {
+            background: rgba(51,119,170,0.10);
+            color: var(--accent);
+        }
+
+        .ns-recent {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ns-recent:empty { display: none; }
+
+        .ns-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px 3px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.1s;
+            max-width: 160px;
+        }
+
+        .ns-pill span.ns-pill-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ns-pill:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .ns-pill.active {
+            background: rgba(51,119,170,0.12);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .ns-pill-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .ns-pill-remove:hover {
+            background: rgba(0,0,0,0.12);
+            color: var(--text);
+        }
+
+        .ns-go {
+            padding: 4px 10px;
+            background: var(--accent);
+            border: none;
+            color: #ffffff;
+            font-family: var(--sans);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .ns-go:hover { background: var(--accent-dim); }
+
+        /* ── Browse mode toggle (namespace vs. date) ── */
+        .browse-toggle {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .browse-toggle-btn {
+            flex: 1;
+            padding: 7px 0;
+            background: none;
+            border: none;
+            font-family: var(--sans);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.12s ease;
+        }
+
+        .browse-toggle-btn:hover { color: var(--text); }
+
+        .browse-toggle-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .header-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status {
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── Workspace ── */
+        .workspace {
+            display: flex;
+            height: calc(100vh - 48px);
+            overflow: hidden;
+        }
+
+        /* ── Left panel ── */
+        .panel-left {
+            width: 260px;
+            min-width: 140px;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .panel-label {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .panel-count {
+            font-size: 10px;
+            color: var(--accent);
+        }
+
+        .tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+
+        .tree::-webkit-scrollbar { width: 4px; }
+        .tree::-webkit-scrollbar-track { background: transparent; }
+        .tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .tree-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 6px 14px;
+            font-size: 11px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.12s ease;
+            gap: 6px;
+            line-height: 1.5;
+        }
+
+        .tree-item:hover {
+            background: rgba(51,119,170,0.06);
+            border-left-color: var(--text-muted);
+        }
+
+        .tree-item.active {
+            background: rgba(51,119,170,0.10);
+            border-left-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tree-item.new { animation: flash 1.2s ease forwards; }
+
+        @keyframes flash {
+            0%   { background: rgba(51,119,170,0.18); }
+            100% { background: rgba(51,119,170,0.10); }
+        }
+
+        .tree-icon {
+            flex-shrink: 0;
+            margin-top: 1px;
+            font-size: 10px;
+        }
+
+        .icon-name       { color: var(--accent-dim); }
+        .icon-collection { color: var(--collection); }
+        .icon-relation   { color: var(--relation); }
+        .icon-object     { color: var(--text-dim); }
+
+        .tree-label {
+            flex: 1;
+            color: var(--text-dim);
+            word-break: break-all;
+        }
+
+        .tree-item.active .tree-label { color: var(--accent); }
+        .tree-item:hover .tree-label  { color: var(--text); }
+
+        .tree-indent { padding-left: 20px; }
+
+        .empty-state {
+            padding: 28px 14px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 11px;
+            line-height: 1.9;
+        }
+
+        /* ── Relations section in tree ── */
+        .tree-section {
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+
+        .tree-section-label {
+            padding: 6px 14px 3px;
+            font-size: 9px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .tree-item-relation {
+            display: flex;
+            align-items: flex-start;
+            padding: 5px 14px 5px 24px;
+            font-size: 10px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.12s ease;
+            gap: 6px;
+            line-height: 1.5;
+        }
+
+        .tree-item-relation:hover {
+            background: rgba(240,168,75,0.06);
+            border-left-color: var(--relation);
+        }
+
+        .tree-item-relation:hover .tree-label { color: var(--relation); }
+
+        .rel-predicate {
+            font-size: 9px;
+            color: var(--relation);
+            letter-spacing: 0.06em;
+            flex-shrink: 0;
+            padding-top: 1px;
+        }
+
+        .rel-target {
+            flex: 1;
+            color: var(--text-dim);
+            word-break: break-all;
+        }
+
+        /* ── Divider ── */
+        .divider {
+            width: 4px;
+            background: var(--border);
+            cursor: col-resize;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .divider:hover, .divider.dragging { background: var(--accent); }
+
+        /* ── Right panel ── */
+        .panel-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+            overflow: hidden;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            min-height: 36px;
+        }
+
+        .crumb {
+            cursor: pointer;
+            color: var(--text-dim);
+            transition: color 0.12s;
+        }
+
+        .crumb:hover { color: var(--accent); }
+
+        .crumb-sep { color: var(--text-muted); }
+
+        .crumb-current { color: var(--text); cursor: default; }
+
+        /* ── Tab strip ── */
+        .tab-strip {
+            display: flex;
+            align-items: stretch;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+            gap: 0;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            font-family: var(--sans);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.12s;
+            margin-bottom: -1px;
+        }
+
+        .tab-btn:hover { color: var(--text); }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-btn.tab-relation.active {
+            color: var(--relation);
+            border-bottom-color: var(--relation);
+        }
+
+        /* Relations count badge — visible without clicking the tab, so a
+           post's relations show up ambiently while browsing, matching how
+           the namespace tree itself already surfaces things at a glance. */
+        .tab-badge {
+            display: inline-block;
+            margin-left: 5px;
+            padding: 1px 5px;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 8px;
+            background: var(--relation);
+            color: var(--bg);
+            letter-spacing: 0;
+            vertical-align: 1px;
+        }
+
+        /* hash display sits in the tab strip on the right */
+        .tab-strip-hash {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-muted);
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .tab-strip-hash span { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Editor header (share + save) */
+        .editor-header {
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .btn {
+            padding: 5px 14px;
+            border: none;
+            font-family: var(--sans);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-primary { background: var(--accent); color: #ffffff; }
+        .btn-primary:hover { background: var(--accent-dim); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-relation {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .btn-relation:hover:not(:disabled) { border-color: var(--relation); color: var(--relation); }
+        .btn-relation:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── Tab panels ── */
+        .tab-panels {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-panel {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: auto;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
+
+        /* Editor */
+        .editor-area { flex: 1; overflow: hidden; position: relative; }
+
+        textarea {
+            width: 100%; height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--serif);
+            font-size: 15px;
+            line-height: 1.85;
+            border: none; outline: none; resize: none;
+            padding: 28px 32px;
+            letter-spacing: 0.01em;
+        }
+
+        textarea::placeholder { color: var(--text-muted); }
+
+        /* ── Relations panel ── */
+        .relations-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        .rel-form {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .rel-form-title {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .rel-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rel-field-label {
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            width: 28px;
+        }
+
+        /* The "from" display — read only, shows current hash */
+        .rel-from-display {
+            flex: 1;
+            font-size: 10px;
+            color: var(--text-dim);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 4px 7px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Shared autocomplete field style */
+        .rel-ac-wrap {
+            flex: 1;
+            position: relative;
+        }
+
+        .rel-ac-input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 11px;
+            padding: 4px 7px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .rel-ac-input:focus { border-color: var(--relation); }
+
+        .rel-ac-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-top: none;
+            z-index: 50;
+            display: none;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .rel-ac-dropdown.visible { display: block; }
+
+        .rel-ac-option {
+            padding: 6px 10px;
+            font-size: 11px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .rel-ac-option:hover, .rel-ac-option.selected {
+            background: rgba(240,168,75,0.08);
+            color: var(--relation);
+        }
+
+        /* Inline preview block */
+        .rel-preview {
+            margin: 0 16px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-top: none;
+            background: var(--surface2);
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .rel-preview.visible { display: flex; }
+
+        .rel-preview-label {
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--relation);
+        }
+
+        .rel-preview-content {
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.6;
+            max-height: 80px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Fade at the bottom of truncated preview */
+        .rel-preview-content::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 24px;
+            background: linear-gradient(transparent, var(--surface2));
+        }
+
+        .rel-form-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        /* Existing relations list */
+        .rel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .rel-list::-webkit-scrollbar { width: 4px; }
+        .rel-list::-webkit-scrollbar-track { background: transparent; }
+        .rel-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .rel-list-section {
+            padding: 8px 16px 4px;
+            font-size: 9px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+        }
+
+        .rel-list-section:first-child { border-top: none; margin-top: 0; }
+
+        .rel-list-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 7px 16px;
+            gap: 8px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.12s;
+            font-size: 11px;
+        }
+
+        .rel-list-item:hover {
+            background: rgba(240,168,75,0.05);
+            border-left-color: var(--relation);
+        }
+
+        .rel-list-item:hover .rel-target { color: var(--relation); }
+
+        .rel-list-empty {
+            padding: 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* ── Map tab (relations treemap) ── */
+
+        .map-metric-tabs {
+            display: flex;
+            gap: 6px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .map-metric-btn {
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .map-metric-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        .map-metric-btn.active {
+            background: rgba(51,119,170,0.12);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        /* Fills whatever vertical space is actually left in the flex-column
+           .tab-panel, rather than deriving height from a fraction of its own
+           width (the old padding-bottom aspect-ratio trick) — on a wide
+           panel that could produce a box taller than the viewport, and with
+           .tab-panel clipping overflow there was no way to scroll to the
+           rest of it. min-height keeps it usable if the window is short. */
+        .map-treemap-wrap {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            min-height: 320px;
+        }
+
+        .map-treemap {
+            position: absolute;
+            inset: 0;
+            margin: 12px;
+        }
+
+        .map-tile {
+            position: absolute;
+            box-sizing: border-box;
+            border: 1px solid var(--bg);
+            padding: 6px 8px;
+            overflow: hidden;
+            cursor: pointer;
+            background: var(--surface);
+            transition: filter 0.1s;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .map-tile:hover { filter: brightness(1.08); }
+
+        /* Tinted fill (not just the border) so a correctly-sized tile is
+           actually visible against the page background — --surface alone
+           is only a few shades off --bg and reads as blank space. */
+        .map-tile.map-tile-out {
+            border-left: 3px solid var(--relation);
+            background: rgba(153, 102, 34, 0.10);
+        }
+        .map-tile.map-tile-in {
+            border-left: 3px solid var(--accent);
+            background: rgba(51, 119, 170, 0.10);
+        }
+
+        .map-tile-rel {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .map-tile-label {
+            font-size: 12px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .map-empty {
+            padding: 24px 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* ── Collection builder ──
+           A mode, not a per-object tab: building a Collection means
+           composing several existing objects into a new one, so it
+           replaces the whole tab-strip/editor/relations area rather than
+           sitting alongside them as a property of whatever's currently
+           open (which is what the Editor/Relations tabs both are). */
+        .collection-builder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        .cb-header {
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .cb-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--collection);
+        }
+
+        .cb-add-row {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .cb-add-row .rel-ac-input:focus { border-color: var(--collection); }
+
+        .cb-members {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .cb-member-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 16px;
+            font-size: 11px;
+            border-left: 2px solid transparent;
+        }
+
+        .cb-member-row:hover {
+            background: rgba(34,119,187,0.05);
+            border-left-color: var(--collection);
+        }
+
+        .cb-member-index {
+            color: var(--text-muted);
+            font-size: 10px;
+            width: 18px;
+            flex-shrink: 0;
+            text-align: right;
+        }
+
+        .cb-member-label {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text);
+        }
+
+        .cb-member-btns {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .cb-member-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 10px;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+
+        .cb-member-btn:hover:not(:disabled) { border-color: var(--collection); color: var(--collection); }
+        .cb-member-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .cb-actions {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .btn-collection {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .btn-collection:hover:not(:disabled) { border-color: var(--collection); color: var(--collection); }
+        .btn-collection:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── Login overlay ── */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .login-overlay.hidden { display: none; }
+
+        .login-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 40px 36px;
+            width: 340px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .login-title {
+            font-family: var(--sans);
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+        }
+
+        .login-sub {
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.7;
+            margin-top: -10px;
+        }
+
+        .login-input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 13px;
+            padding: 8px 10px;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.15s;
+        }
+
+        .login-input:focus { border-color: var(--accent); }
+
+        .login-msg {
+            font-size: 12px;
+            color: var(--text-dim);
+            min-height: 16px;
+            text-align: center;
+        }
+
+        .login-msg.success { color: var(--accent); }
+        .login-msg.error   { color: var(--danger); }
+
+        .btn-logout {
+            padding: 4px 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-family: var(--sans);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+    </style>
+    <link rel="stylesheet" href="toast.css">
+    <script src="toast.js"></script>
+</head>
+<body>
+
+<!-- Login overlay — shown when no session JWT is present -->
+<div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+        <div class="login-title">Hatcheck</div>
+        <div class="login-sub">Enter your email to receive a magic link.</div>
+        <input class="login-input" id="login-email" type="email"
+               placeholder="you@example.com"
+               onkeydown="if(event.key==='Enter') sendMagicLink()">
+        <button class="btn btn-primary" onclick="sendMagicLink()" id="login-btn">Send magic link</button>
+        <div class="login-msg" id="login-msg"></div>
+    </div>
+</div>
+
+<header>
+    <h1>Hatcheck</h1>
+    <div class="header-right">
+        <button class="btn btn-ghost" onclick="newObject()" title="New object in current namespace">+ New</button>
+        <button class="btn btn-ghost" onclick="newCollection()" title="Build a new collection from existing objects">+ New Collection</button>
+        <button class="btn btn-ghost" onclick="triggerImport()" title="Import a shared archive">↓ Import</button>
+        <input type="file" id="import-file-input" accept=".tar.gz,.gz" style="display:none" onchange="handleImportFile(this)">
+        <button class="btn btn-ghost" id="export-btn" onclick="exportNamespace()" disabled title="Export the current namespace">↑ Export</button>
+        <div class="status">
+            <div class="status-dot"></div>
+            <span id="status-text">ready</span>
+        </div>
+        <button class="btn btn-ghost" id="notebook-link-btn" onclick="openNotebook()" style="display:none" title="Open the Notebook app (Deep)">Notebook &rarr;</button>
+        <button class="btn-logout" id="logout-btn" onclick="logout()" style="display:none">Sign out</button>
+    </div>
+</header>
+
+<div class="workspace">
+    <div class="panel-left" id="panel-left">
+        <div class="ns-input-wrap" id="ns-input-wrap">
+            <span class="ns-label">ns</span>
+            <input class="ns-input" id="ns-input" type="text" placeholder="namespace"
+                   autocomplete="off"
+                   oninput="onNsInput(this.value)"
+                   onfocus="onNsFocus()"
+                   onblur="onNsBlur()">
+            <div class="ns-dropdown" id="ns-dropdown"></div>
+            <button class="ns-go" onclick="loadNamespace()">Go</button>
+        </div>
+        <div class="ns-recent" id="ns-recent"></div>
+        <div class="browse-toggle">
+            <button class="browse-toggle-btn active" id="browse-toggle-namespace" onclick="setBrowseMode('namespace')">By namespace</button>
+            <button class="browse-toggle-btn" id="browse-toggle-date" onclick="setBrowseMode('date')">By date</button>
+        </div>
+        <div class="panel-header">
+            <span class="panel-label" id="panel-title">Names</span>
+            <span class="panel-count" id="panel-count">—</span>
+        </div>
+        <div class="tree" id="tree">
+            <div class="empty-state">Enter a namespace<br>and click Go.</div>
+        </div>
+    </div>
+
+    <div class="divider" id="divider"></div>
+
+    <div class="panel-right">
+        <div class="breadcrumb" id="breadcrumb">
+            <span style="color:var(--text-muted);font-size:11px">No selection</span>
+        </div>
+
+        <!-- Tab strip replaces the old editor-header hash display -->
+        <div class="tab-strip" id="tab-strip">
+            <button class="tab-btn active" id="tab-editor-btn" onclick="switchTab('editor')">Editor</button>
+            <button class="tab-btn tab-relation" id="tab-relation-btn" onclick="switchTab('relations')" disabled>Relations<span class="tab-badge" id="rel-tab-badge" style="display:none"></span></button>
+            <button class="tab-btn tab-map" id="tab-map-btn" onclick="switchTab('map')" disabled>Map</button>
+            <div class="tab-strip-hash">
+                <span id="current-hash">—</span>
+            </div>
+        </div>
+
+        <!-- Save always visible above tab panels. Export lives in the top
+             toolbar now (see header), since it exports the whole current
+             namespace rather than just the document open here. -->
+        <div class="editor-header" id="editor-header">
+            <button class="btn btn-primary" id="save-btn" onclick="saveContent()" disabled>Save</button>
+        </div>
+
+        <!-- Tab panels -->
+        <div class="tab-panels">
+
+            <!-- Editor tab -->
+            <div class="tab-panel active" id="panel-editor">
+                <div class="editor-area">
+                    <textarea id="editor"
+                        placeholder="Select a text object from the left panel to edit it.&#10;&#10;Use #hashtags to tag objects for discovery."
+                        oninput="onEditorChange()"></textarea>
+                </div>
+            </div>
+
+            <!-- Relations tab -->
+            <div class="tab-panel" id="panel-relations">
+                <div class="relations-panel">
+
+                    <!-- Create relation form -->
+                    <div class="rel-form">
+                        <div class="rel-form-title">New relation</div>
+
+                        <!-- From: current object, read-only -->
+                        <div class="rel-row">
+                            <span class="rel-field-label">from</span>
+                            <div class="rel-from-display" id="rel-from-display">—</div>
+                        </div>
+
+                        <!-- Rel: autocomplete from tag vocabulary -->
+                        <div class="rel-row">
+                            <span class="rel-field-label">rel</span>
+                            <div class="rel-ac-wrap">
+                                <input class="rel-ac-input" id="rel-type-input"
+                                       type="text" placeholder="relation type…"
+                                       autocomplete="off"
+                                       oninput="onRelTypeInput(this.value)"
+                                       onfocus="onRelTypeFocus()"
+                                       onblur="onRelTypeBlur()"
+                                       onkeydown="onRelTypeKey(event)">
+                                <div class="rel-ac-dropdown" id="rel-type-dropdown"></div>
+                            </div>
+                        </div>
+
+                        <!-- To: search across named objects -->
+                        <div class="rel-row">
+                            <span class="rel-field-label">to</span>
+                            <div class="rel-ac-wrap">
+                                <input class="rel-ac-input" id="rel-to-input"
+                                       type="text" placeholder="search objects…"
+                                       autocomplete="off"
+                                       oninput="onRelToInput(this.value)"
+                                       onfocus="onRelToFocus()"
+                                       onblur="onRelToBlur()"
+                                       onkeydown="onRelToKey(event)">
+                                <div class="rel-ac-dropdown" id="rel-to-dropdown"></div>
+                            </div>
+                        </div>
+
+                        <!-- Inline preview of selected "to" object -->
+                        <div class="rel-preview" id="rel-preview">
+                            <div class="rel-preview-label" id="rel-preview-label">Preview</div>
+                            <div class="rel-preview-content" id="rel-preview-content"></div>
+                        </div>
+
+                        <div class="rel-form-actions">
+                            <button class="btn btn-relation" id="rel-create-btn"
+                                    onclick="createRelation()" disabled>Create relation</button>
+                        </div>
+                    </div>
+
+                    <!-- Existing relations list -->
+                    <div class="rel-list" id="rel-list">
+                        <div class="rel-list-empty">No relations for this object.</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Map tab: a treemap of this object's direct relations (both
+                 outgoing and incoming, mixed together — direction is shown
+                 per-tile rather than as separate regions), tile size driven
+                 by whichever metric is selected. Always one level deep —
+                 clicking a tile navigates to that object via the normal
+                 navigateToHash() path, which re-renders the treemap
+                 centered on the new object rather than nesting deeper. -->
+            <div class="tab-panel" id="panel-map">
+                <div class="map-metric-tabs">
+                    <button class="map-metric-btn active" id="map-metric-fanout" onclick="setMapMetric('fanout')">Fan-out</button>
+                    <button class="map-metric-btn" id="map-metric-recency" onclick="setMapMetric('recency')">Recency</button>
+                    <button class="map-metric-btn" id="map-metric-tags" onclick="setMapMetric('tags')">Tag overlap</button>
+                </div>
+                <div class="map-treemap-wrap">
+                    <div class="map-treemap" id="map-treemap"></div>
+                    <div class="map-empty" id="map-empty" style="display:none">No relations for this object.</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Collection builder — a mode entered via the "+ New Collection"
+             header button, not a tab; replaces tab-strip/editor/relations
+             entirely while active. See newCollection()/cancelCollectionBuilder(). -->
+        <div class="collection-builder" id="collection-builder-view" style="display:none">
+            <div class="cb-header">
+                <div class="cb-title">New collection</div>
+                <button class="btn btn-ghost" onclick="cancelCollectionBuilder()">Cancel</button>
+            </div>
+            <div class="cb-add-row">
+                <div class="rel-ac-wrap">
+                    <input class="rel-ac-input" id="cb-add-input" type="text" placeholder="search objects to add…"
+                           autocomplete="off"
+                           oninput="onCbAddInput(this.value)"
+                           onfocus="onCbAddFocus()"
+                           onblur="onCbAddBlur()">
+                    <div class="rel-ac-dropdown" id="cb-add-dropdown"></div>
+                </div>
+            </div>
+            <div class="cb-members" id="cb-members">
+                <div class="empty-state">No members yet — search above to add objects.</div>
+            </div>
+            <div class="cb-actions">
+                <button class="btn btn-collection" id="cb-create-btn" onclick="createCollection()" disabled>Create collection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast">
+    <div class="toast-label" id="toast-label">Info</div>
+    <div id="toast-msg"></div>
+</div>
+
+<script>
+const API = '';  // same origin
+
+// ── Auth state ──
+let sessionJWT      = sessionStorage.getItem('session_jwt') || '';
+let userID          = sessionStorage.getItem('user_id') || '';
+let capabilityToken = sessionStorage.getItem('capability_token') || '';
+// browseCapToken is any valid capability the user holds, used for ambient read
+// calls (namespaces, names, tags, etc.) that don't target a specific object.
+// Populated from the first capability the server issues (e.g. on stash).
+let browseCapToken  = sessionStorage.getItem('browse_cap_token') || '';
+
+// Show/hide login overlay based on auth state.
+function updateAuthUI() {
+    const loggedIn = !!sessionJWT;
+    document.getElementById('login-overlay').classList.toggle('hidden', loggedIn);
+    document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
+    document.getElementById('notebook-link-btn').style.display = loggedIn ? '' : 'none';
+}
+
+// Deep (the Notebook app) runs on its own origin, so sessionStorage set
+// here isn't visible there — this hands off the already-obtained session
+// JWT and capability token as query params. Deep reads them once on load
+// and stores them in its own origin's sessionStorage; Hatcheck's own auth
+// code is untouched by this.
+const DEEP_URL = 'http://localhost:8091';
+function openNotebook() {
+    if (!sessionJWT) return;
+    const params = new URLSearchParams({
+        session_jwt: sessionJWT,
+        capability_token: browseCapToken,
+    });
+    window.location.href = `${DEEP_URL}/ui/notebook.html?${params.toString()}`;
+}
+
+// apiFetch wraps fetch() to inject auth headers on every request.
+// On 401, clears auth state and shows the login screen.
+async function apiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    if (sessionJWT) {
+        headers['Authorization'] = `Bearer ${sessionJWT}`;
+        headers['X-User-ID'] = userID;
+    }
+    // Use the active per-object capability if set; fall back to the browse
+    // capability for ambient metadata calls (namespaces, names, tags, etc.).
+    const activeCap = capabilityToken || browseCapToken;
+    if (activeCap) {
+        headers['X-Capability-Token'] = activeCap;
+    }
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+        // Only treat 401 as session expiry on auth endpoints.
+        // Data/capability endpoints should return 403 for missing capabilities,
+        // but guard here in case the server conflates the two.
+        if (url.includes('/auth/')) {
+            clearAuth();
+            showToast('Session expired', 'Please sign in again.', true);
+            throw new Error('Session expired');
+        }
+        // Non-auth 401 — likely a capability issue. Don't wipe the session.
+        showToast('Access denied', 'You may not have a capability for this object.', true);
+        throw new Error('Access denied');
+    }
+    return res;
+}
+
+function clearAuth() {
+    sessionJWT = '';
+    userID = '';
+    capabilityToken = '';
+    browseCapToken = '';
+    sessionStorage.removeItem('session_jwt');
+    sessionStorage.removeItem('user_id');
+    sessionStorage.removeItem('capability_token');
+    sessionStorage.removeItem('browse_cap_token');
+    sessionStorage.removeItem('namespace');
+    namespace = '';
+    updateAuthUI();
+}
+
+function logout() {
+    clearAuth();
+    showToast('Signed out', 'See you next time.');
+}
+
+// Send magic link to email.
+async function sendMagicLink() {
+    const email = document.getElementById('login-email').value.trim();
+    const msg   = document.getElementById('login-msg');
+    const btn   = document.getElementById('login-btn');
+
+    if (!email) {
+        msg.textContent = 'Enter your email address.';
+        msg.className = 'login-msg error';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    msg.textContent = '';
+    msg.className = 'login-msg';
+
+    try {
+        const res = await apiFetch(`${API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        if (!res.ok) throw new Error('Failed to send magic link');
+        msg.textContent = 'Magic link sent — check your email.';
+        msg.className = 'login-msg success';
+    } catch(err) {
+        msg.textContent = err.message;
+        msg.className = 'login-msg error';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send magic link';
+    }
+}
+
+// Handle magic link callback — server redirects here with session_jwt and user_id
+// as query parameters after authenticating the Stytch token.
+async function handleMagicLinkCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const jwt       = params.get('session_jwt');
+    const uid       = params.get('user_id');
+    const email     = params.get('email');
+    const readCap   = params.get('read_cap');
+    const defaultNs = params.get('default_ns');
+    if (!jwt) return;
+
+    // Clean the parameters from the URL without a page reload.
+    window.history.replaceState({}, '', window.location.pathname);
+
+    sessionJWT = jwt;
+    userID     = uid;
+    sessionStorage.setItem('session_jwt', sessionJWT);
+    sessionStorage.setItem('user_id', userID);
+
+    // Store the wildcard read capability issued by the server at login.
+    // This allows fetching any object without a per-object capability.
+    if (readCap) {
+        browseCapToken = readCap;
+        sessionStorage.setItem('browse_cap_token', browseCapToken);
+    }
+
+    // Apply the server's suggested default namespace (see defaultNamespace
+    // in server/auth_handlers.go) as the starting namespace, but only if
+    // we don't already have one active — a fresh login shouldn't clobber
+    // a namespace the user was already mid-session on (e.g. a page reload
+    // that happens to still carry stale callback params).
+    if (defaultNs && !namespace) {
+        namespace = defaultNs;
+        sessionStorage.setItem('namespace', namespace);
+    }
+
+    updateAuthUI();
+    showToast('Signed in', email || uid);
+}
+// On load: check for magic link callback params, then update auth UI.
+// Must be inside DOMContentLoaded — updateAuthUI touches the DOM and the
+// elements it references don't exist yet when the script first executes.
+document.addEventListener('DOMContentLoaded', () => {
+    handleMagicLinkCallback().then(updateAuthUI);
+    // handleMagicLinkCallback is async but has no awaits in its body, so
+    // by the time the call above returns, sessionJWT/browseCapToken/
+    // namespace are already updated synchronously — safe to read here.
+    if (namespace) {
+        document.getElementById('ns-input').value = namespace;
+        loadNamespace();
+    }
+    renderRecentNamespaces();
+
+    // Chrome remembers values typed into this field across page loads and
+    // offers them as a native suggestion list, ignoring autocomplete="off".
+    // A name that changes every load gives it nothing to match against, so
+    // there's nothing for it to accumulate or offer.
+    document.getElementById('ns-input').name = 'ns-' + Math.random().toString(36).slice(2);
+});
+
+// Load capability for a specific hash from sessionStorage.
+// Called when navigating to an existing object to set the active capability.
+function loadCapabilityForHash(hash) {
+    const caps = JSON.parse(sessionStorage.getItem('capabilities') || '{}');
+    if (caps[hash]) {
+        capabilityToken = JSON.stringify(caps[hash]);
+        sessionStorage.setItem('capability_token', capabilityToken);
+    } else {
+        // No local capability for this hash — clear active token.
+        // The request will fail with 403 if the user doesn't own it
+        // and hasn't been granted a capability by the owner.
+        capabilityToken = '';
+        sessionStorage.removeItem('capability_token');
+    }
+}
+
+// ── State ──
+let namespace  = sessionStorage.getItem('namespace') || '';
+let nameList   = []; // [{label, hash}]
+
+// Navigation path stack.
+// Each frame: { type, label, hash, members, index }
+let pathStack  = [];
+
+let currentHash    = null;
+let currentLabel   = null;
+let editorDirty    = false;
+let currentTab     = 'editor';
+
+// ── Relations state ──
+let allTags         = [];   // tag vocabulary for rel-type picker
+let relTypeSelected = -1;   // keyboard selection index in rel-type dropdown
+let relToSelected   = -1;   // keyboard selection index in to-object dropdown
+let relToHash       = null; // hash of chosen "to" object
+let relToLabel      = null; // label of chosen "to" object
+let allNamesFlat    = [];   // [{label, hash}] across all namespaces for object search
+let namespaceCache  = {};   // namespace -> nameList, for every namespace loaded this session
+                             // ("workspace" of namespaces visited so far, not the whole server)
+let namesByHash      = {};  // hash -> {label, kind, namespace}, merged from namespaceCache in
+                             // renderNameList() — lets collection members resolve to a name
+                             // even when it lives in a namespace other than the current one.
+
+// ── Draggable divider ──
+const divider   = document.getElementById('divider');
+const panelLeft = document.getElementById('panel-left');
+let dragging = false;
+
+divider.addEventListener('mousedown', () => {
+    dragging = true;
+    divider.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+});
+
+document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const rect = panelLeft.parentElement.getBoundingClientRect();
+    const w = Math.max(140, Math.min(panelLeft.parentElement.offsetWidth - 200, e.clientX - rect.left));
+    panelLeft.style.width = w + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+});
+
+// ── Recent namespaces (quick-switch pills) ──
+// Persisted in localStorage (unlike the *current* namespace, which lives in
+// sessionStorage) so your recent list survives across logins/tabs. This is
+// deliberately just "namespaces you've visited", not an ownership concept —
+// Hatcheck has no notion of namespace ownership, so this is purely a
+// client-side convenience for jumping back to places you've been.
+const RECENT_NS_KEY = 'hatcheck-recent-namespaces';
+const RECENT_NS_MAX = 8;
+
+function loadRecentNamespaces() {
+    try {
+        const list = JSON.parse(localStorage.getItem(RECENT_NS_KEY));
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveRecentNamespaces(list) {
+    try {
+        localStorage.setItem(RECENT_NS_KEY, JSON.stringify(list));
+    } catch (e) {}
+}
+
+// Called after a namespace successfully loads — moves it to the front of
+// the recent list (deduping), trims to RECENT_NS_MAX, and re-renders.
+function addRecentNamespace(ns) {
+    let list = loadRecentNamespaces().filter(n => n !== ns);
+    list.unshift(ns);
+    if (list.length > RECENT_NS_MAX) list = list.slice(0, RECENT_NS_MAX);
+    saveRecentNamespaces(list);
+    renderRecentNamespaces();
+}
+
+function removeRecentNamespace(ns, event) {
+    event.stopPropagation(); // don't also trigger the pill's own switch-to click
+    saveRecentNamespaces(loadRecentNamespaces().filter(n => n !== ns));
+    renderRecentNamespaces();
+}
+
+function switchToNamespace(ns) {
+    document.getElementById('ns-input').value = ns;
+    loadNamespace();
+}
+
+function renderRecentNamespaces() {
+    const el = document.getElementById('ns-recent');
+    const list = loadRecentNamespaces();
+
+    el.innerHTML = list.map(ns => `
+        <span class="ns-pill ${ns === namespace ? 'active' : ''}" onclick="switchToNamespace('${escAttr(ns)}')" title="Switch to ${escHtml(ns)}">
+            <span class="ns-pill-label">${escHtml(ns)}</span>
+            <span class="ns-pill-remove" onclick="removeRecentNamespace('${escAttr(ns)}', event)" title="Remove from recent">×</span>
+        </span>
+    `).join('');
+}
+
+// ── Namespace autocomplete ──
+let allNamespaces = [];
+let nsSelectedIndex = -1;
+
+async function fetchNamespaces() {
+    if (!browseCapToken) return;   // no capability yet — skip rather than risk a 401
+    try {
+        const res = await apiFetch(`${API}/namespaces`);
+        if (res.ok) allNamespaces = await res.json();
+    } catch(e) {}
+}
+
+function onNsFocus() {
+    fetchNamespaces().then(() => renderNsDropdown(document.getElementById('ns-input').value));
+}
+
+function onNsInput(val) {
+    nsSelectedIndex = -1;
+    renderNsDropdown(val);
+}
+
+function renderNsDropdown(val) {
+    const dropdown = document.getElementById('ns-dropdown');
+    const filtered = val
+        ? allNamespaces.filter(ns => ns.toLowerCase().startsWith(val.toLowerCase()))
+        : allNamespaces;
+
+    if (filtered.length === 0) {
+        dropdown.classList.remove('visible');
+        return;
+    }
+
+    dropdown.innerHTML = filtered.map((ns, i) => `
+        <div class="ns-option ${i === nsSelectedIndex ? 'selected' : ''}"
+             onmousedown="selectNamespace('${ns}')">
+            ${ns}
+        </div>
+    `).join('');
+    dropdown.classList.add('visible');
+}
+
+function selectNamespace(ns) {
+    document.getElementById('ns-input').value = ns;
+    document.getElementById('ns-dropdown').classList.remove('visible');
+    loadNamespace();
+}
+
+function onNsBlur() {
+    setTimeout(() => {
+        document.getElementById('ns-dropdown').classList.remove('visible');
+    }, 150);
+}
+
+// ── Namespace ──
+async function loadNamespace() {
+    namespace = document.getElementById('ns-input').value.trim();
+    if (!namespace) return;
+    sessionStorage.setItem('namespace', namespace);
+
+    pathStack    = [];
+    currentHash  = null;
+    currentLabel = null;
+    editorDirty  = false;
+    document.getElementById('export-btn').disabled = true;
+    renderBreadcrumb();
+    renderEditor(null, null);
+
+    try {
+        const res = await apiFetch(`${API}/names?namespace=${encodeURIComponent(namespace)}`);
+        if (!res.ok) throw new Error('Failed to load namespace');
+        nameList = await res.json();
+        renderNameList();
+        document.getElementById('export-btn').disabled = false;
+        addRecentNamespace(namespace);
+    } catch (err) {
+        showToast('Error', err.message, true);
+    }
+}
+
+// Icon shown per name-list entry, based on the kind field /names now
+// returns (see server's KindIndex — determined from the log entry that
+// created the hash, not by fetching and parsing content). Falls back to
+// the plain document icon for 'stash' and for anything unrecognized
+// (older data written before this existed won't have a kind yet).
+function iconForKind(kind) {
+    if (kind === 'collection') return { cls: 'icon-collection', glyph: '▤' };
+    if (kind === 'relation')   return { cls: 'icon-relation',   glyph: '→' };
+    return { cls: 'icon-name', glyph: '▸' };
+}
+
+function renderNameList() {
+    const tree = document.getElementById('tree');
+    document.getElementById('panel-count').textContent = nameList.length;
+    document.getElementById('panel-title').textContent = 'Names';
+
+    // Cache this namespace's names, then rebuild the merged hash -> name
+    // lookup across every namespace visited this session (the "workspace"),
+    // used by renderCollectionPanel. Current namespace is merged in last so
+    // it wins on hash collisions — if the same hash happens to be named in
+    // both the current and another namespace, prefer the local one.
+    namespaceCache[namespace] = nameList;
+    namesByHash = {};
+    for (const ns of Object.keys(namespaceCache)) {
+        if (ns === namespace) continue;
+        for (const n of namespaceCache[ns]) {
+            namesByHash[n.hash] = { label: n.label, kind: n.kind, namespace: ns };
+        }
+    }
+    for (const n of nameList) {
+        namesByHash[n.hash] = { label: n.label, kind: n.kind, namespace: namespace };
+    }
+
+    if (!nameList || nameList.length === 0) {
+        tree.innerHTML = '<div class="empty-state">No names in this namespace.</div>';
+        return;
+    }
+
+    tree.innerHTML = nameList.map(n => {
+        const icon = iconForKind(n.kind);
+        return `
+        <div class="tree-item ${n.hash === currentHash ? 'active' : ''}"
+             onclick="selectName('${n.label}', '${n.hash}')">
+            <span class="tree-icon ${icon.cls}">${icon.glyph}</span>
+            <span class="tree-label">${n.label}</span>
+        </div>
+    `;
+    }).join('');
+}
+
+// ── Browse by date ──
+// A second way into content, alongside namespace/name browsing. Content is
+// otherwise only reachable via a Name or by already knowing its hash — this
+// surfaces everything ever stashed, grouped by the day it was stashed,
+// which also catches content that was never given a Name at all.
+let browseMode   = 'namespace'; // 'namespace' | 'date'
+let allDates     = [];
+let datesLoaded  = false;       // cached like allTags — dates only change on new stashes
+let selectedDate = null;
+let dateHashes   = [];
+
+function setBrowseMode(mode) {
+    // No early return on mode === browseMode: clicking the already-active
+    // tab is the reset affordance back to that mode's top-level view after
+    // descending into a collection overwrote #tree (the same thing already
+    // happens in namespace mode — this mirrors it for date mode).
+    browseMode = mode;
+    document.getElementById('browse-toggle-namespace').classList.toggle('active', mode === 'namespace');
+    document.getElementById('browse-toggle-date').classList.toggle('active', mode === 'date');
+    document.getElementById('ns-input-wrap').style.display = mode === 'namespace' ? '' : 'none';
+
+    if (mode === 'namespace') {
+        document.getElementById('panel-title').textContent = 'Names';
+        if (namespace) {
+            renderNameList();
+        } else {
+            document.getElementById('panel-count').textContent = '—';
+            document.getElementById('tree').innerHTML = '<div class="empty-state">Enter a namespace<br>and click Go.</div>';
+        }
+    } else {
+        selectedDate = null;
+        loadDatesList();
+    }
+}
+
+async function loadDatesList() {
+    if (!datesLoaded) {
+        try {
+            const res = await apiFetch(`${API}/dates`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            allDates = await res.json();
+            datesLoaded = true;
+        } catch (err) {
+            showToast('Error', 'Failed to load dates', true);
+            return;
+        }
+    }
+    renderDatesList();
+}
+
+function renderDatesList() {
+    selectedDate = null;
+    const tree = document.getElementById('tree');
+    document.getElementById('panel-title').textContent = 'Dates';
+    document.getElementById('panel-count').textContent = allDates.length;
+
+    if (!allDates.length) {
+        tree.innerHTML = '<div class="empty-state">Nothing stashed yet.</div>';
+        return;
+    }
+
+    // allDates is already sorted most-recent-first by the server.
+    tree.innerHTML = allDates.map(date => `
+        <div class="tree-item" onclick="selectDate('${escAttr(date)}')">
+            <span class="tree-icon icon-name">▸</span>
+            <span class="tree-label">${escHtml(date)}</span>
+        </div>
+    `).join('');
+}
+
+async function selectDate(date) {
+    selectedDate = date;
+    document.getElementById('panel-title').textContent = date;
+
+    try {
+        const res = await apiFetch(`${API}/query?index=date&key=${encodeURIComponent(date)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        dateHashes = await res.json();
+        renderDateHashList();
+    } catch (err) {
+        showToast('Error', 'Failed to load that date', true);
+    }
+}
+
+function renderDateHashList() {
+    const tree = document.getElementById('tree');
+    document.getElementById('panel-count').textContent = dateHashes.length;
+
+    let html = `
+        <div class="tree-item" onclick="renderDatesList()">
+            <span class="tree-icon icon-name">‹</span>
+            <span class="tree-label">All dates</span>
+        </div>
+    `;
+
+    if (!dateHashes.length) {
+        html += '<div class="empty-state">Nothing stashed on this date.</div>';
+    } else {
+        // These hashes may or may not have a Name anywhere — navigateToHash
+        // already handles both cases (looks up a Name if one exists in the
+        // current namespace, otherwise descends directly by hash).
+        html += dateHashes.map(hash => `
+            <div class="tree-item ${hash === currentHash ? 'active' : ''}" onclick="navigateToHash('${escAttr(hash)}')">
+                <span class="tree-icon icon-object">·</span>
+                <span class="tree-label">${escHtml(hash.slice(0, 12))}…</span>
+            </div>
+        `).join('');
+    }
+
+    tree.innerHTML = html;
+}
+
+// ── Navigation ──
+async function selectName(label, hash) {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    pathStack    = [{ type: 'name', label, hash, members: null, index: null }];
+    currentLabel = label;
+    editorDirty  = false;
+    await descend(hash);
+}
+
+async function descend(hash) {
+    renderBreadcrumb();
+    loadCapabilityForHash(hash);
+
+    // If we have no capability for this specific hash, try the browse token.
+    // The server will accept it only if it's a wildcard (*) capability.
+    // If neither covers the hash, the fetch will 403 — report that clearly.
+    try {
+        const res = await apiFetch(`${API}/fetch?hash=${hash}`);
+        if (res.status === 403) throw new Error('No capability for this object');
+        if (res.status === 404) throw new Error('Object not found');
+        if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+        const content = await res.text();
+        const trimmed = content.trimEnd();
+
+        let parsed;
+        try { parsed = JSON.parse(trimmed); } catch(e) {}
+
+        if (Array.isArray(parsed) && parsed.every(h => typeof h === 'string')) {
+            renderCollectionPanel(parsed, hash);
+            return;
+        }
+
+        if (parsed && typeof parsed === 'object' && parsed.from && parsed.to && parsed.rel) {
+            renderEditor(hash, trimmed, true);
+            return;
+        }
+
+        renderEditor(hash, trimmed);
+
+    } catch(err) {
+        showToast('Error', err.message, true);
+    }
+}
+
+function renderCollectionPanel(members, collectionHash) {
+    const tree = document.getElementById('tree');
+    document.getElementById('panel-count').textContent = members.length;
+    document.getElementById('panel-title').textContent = 'Collection';
+
+    if (members.length === 0) {
+        tree.innerHTML = '<div class="empty-state">Empty collection.</div>';
+        return;
+    }
+
+    pathStack[pathStack.length - 1].members = members;
+
+    // Members are anonymous CAS objects, identified only by hash — but many
+    // will also have a Name pointing at them somewhere in the workspace of
+    // namespaces visited this session (loaded into namesByHash). Show that
+    // name when we have it, tagging it with its source namespace if that
+    // differs from the one currently being browsed, so "named elsewhere" is
+    // visually distinct from "named locally". Falls back to a shortened
+    // hash when no name is known at all. The full hash is always available
+    // via the title attribute.
+    tree.innerHTML = members.map((hash, i) => {
+        const known = namesByHash[hash];
+        const icon = known ? iconForKind(known.kind) : { cls: 'icon-object', glyph: '·' };
+        const display = known
+            ? (known.namespace === namespace ? known.label : `${known.label} (${known.namespace})`)
+            : hash.slice(0, 8) + '…';
+        return `
+        <div class="tree-item ${hash === currentHash ? 'active' : ''}"
+             onclick="selectMember(${i}, '${hash}')" title="${hash}">
+            <span class="tree-icon ${icon.cls}">${icon.glyph}</span>
+            <span class="tree-label">${display}</span>
+        </div>
+    `;
+    }).join('');
+}
+
+async function selectMember(index, hash) {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    const parent = pathStack[pathStack.length - 1];
+    parent.index = index;
+
+    pathStack.push({ type: 'collection', label: hash.slice(0, 8) + '…', hash, members: null, index: null });
+    editorDirty = false;
+    await descend(hash);
+}
+
+async function navigateTo(depth) {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    pathStack = pathStack.slice(0, depth + 1);
+    editorDirty = false;
+
+    const frame = pathStack[pathStack.length - 1];
+    if (depth === 0) {
+        pathStack = [];
+        renderNameList();
+        renderBreadcrumb();
+        renderEditor(null, null);
+    } else {
+        await descend(frame.hash);
+    }
+}
+
+// ── Tab switching ──
+function switchTab(tab) {
+    currentTab = tab;
+
+    document.getElementById('tab-editor-btn').classList.toggle('active', tab === 'editor');
+    document.getElementById('tab-relation-btn').classList.toggle('active', tab === 'relations');
+    document.getElementById('tab-map-btn').classList.toggle('active', tab === 'map');
+    document.getElementById('panel-editor').classList.toggle('active', tab === 'editor');
+    document.getElementById('panel-relations').classList.toggle('active', tab === 'relations');
+    document.getElementById('panel-map').classList.toggle('active', tab === 'map');
+
+    // Save/share only meaningful in editor tab.
+    const editorHeader = document.getElementById('editor-header');
+    editorHeader.style.display = tab === 'editor' ? '' : 'none';
+
+    if (tab === 'relations' && currentHash) {
+        loadRelationsPanel(currentHash);
+    }
+    if (tab === 'map' && currentHash) {
+        loadMapPanel(currentHash);
+    }
+}
+
+// ── Editor ──
+function renderEditor(hash, content, readOnly = false) {
+    currentHash = hash;
+    const editor   = document.getElementById('editor');
+    const saveBtn  = document.getElementById('save-btn');
+    const hashEl   = document.getElementById('current-hash');
+    const relTab   = document.getElementById('tab-relation-btn');
+
+    editor.value    = content || '';
+    editor.readOnly = readOnly;
+    editor.placeholder = readOnly
+        ? 'Relation object — read only.'
+        : 'Write something here…\n\nUse #hashtags to tag objects for discovery.';
+
+    saveBtn.disabled  = readOnly || (!hash && pathStack.length === 0);
+    hashEl.textContent = hash ? hash : '—';
+    editorDirty = false;
+
+    // Enable Relations/Map tabs only when a hash is loaded.
+    relTab.disabled = !hash;
+    document.getElementById('tab-map-btn').disabled = !hash;
+
+    // Always fetch relations when a document opens, regardless of which
+    // tab is active — this is what makes the count badge on the tab
+    // itself show up ambiently while browsing, instead of only appearing
+    // after clicking into the Relations tab for that specific post.
+    if (hash) {
+        loadRelationsPanel(hash);
+    } else {
+        document.getElementById('rel-tab-badge').style.display = 'none';
+    }
+
+    // Unlike Relations, the Map tab has no ambient badge to keep fresh —
+    // there's nothing useful to show about it when it isn't the active
+    // tab, so only reload it if it's actually what's currently visible.
+    // (Selecting the Map tab itself, via switchTab(), covers the case of
+    // switching to it while already sitting on a hash; this covers
+    // navigating to a *different* hash while the Map tab is already open.)
+    if (hash && currentTab === 'map') {
+        loadMapPanel(hash);
+    }
+
+    // Update rel-from display.
+    document.getElementById('rel-from-display').textContent = hash || '—';
+
+    // Highlight active item in tree.
+    document.querySelectorAll('.tree-item').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-hash') === hash);
+    });
+}
+
+function onEditorChange() {
+    editorDirty = true;
+    document.getElementById('save-btn').disabled = false;
+}
+
+// ── Relations panel ──
+
+// Load and display relations for the given hash in both the panel and tree.
+async function loadRelationsPanel(hash) {
+    if (!hash) return;
+
+    // Reset create form.
+    resetRelForm();
+
+    try {
+        const res = await apiFetch(`${API}/relations?hash=${hash}`);
+        if (!res.ok) throw new Error('Failed to load relations');
+        const data = await res.json();
+        const outgoing = data.outgoing || [];
+        const incoming = data.incoming || [];
+        renderRelList(outgoing, incoming);
+        renderTreeRelations(hash, outgoing, incoming);
+
+        const badge = document.getElementById('rel-tab-badge');
+        const total = outgoing.length + incoming.length;
+        if (total > 0) {
+            badge.textContent = total;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch(err) {
+        showToast('Error', err.message, true);
+    }
+}
+
+// Render the existing relations list inside the Relations panel.
+function renderRelList(outgoing, incoming) {
+    const list = document.getElementById('rel-list');
+
+    if (outgoing.length === 0 && incoming.length === 0) {
+        list.innerHTML = '<div class="rel-list-empty">No relations for this object.</div>';
+        return;
+    }
+
+    let html = '';
+
+    if (outgoing.length > 0) {
+        html += `<div class="rel-list-section">Outgoing</div>`;
+        html += outgoing.map(r => {
+            const label = labelForHash(r.to) || r.to.slice(0, 12) + '…';
+            return `
+                <div class="rel-list-item" onclick="navigateToHash('${r.to}')">
+                    <span class="rel-predicate">${escHtml(r.rel)}</span>
+                    <span class="rel-target">${escHtml(label)}</span>
+                </div>`;
+        }).join('');
+    }
+
+    if (incoming.length > 0) {
+        html += `<div class="rel-list-section">Incoming</div>`;
+        html += incoming.map(r => {
+            const label = labelForHash(r.from) || r.from.slice(0, 12) + '…';
+            return `
+                <div class="rel-list-item" onclick="navigateToHash('${r.from}')">
+                    <span class="rel-predicate">${escHtml(r.rel)}</span>
+                    <span class="rel-target">${escHtml(label)}</span>
+                </div>`;
+        }).join('');
+    }
+
+    list.innerHTML = html;
+}
+
+// Render relation nodes under the current object in the left tree panel.
+function renderTreeRelations(hash, outgoing, incoming) {
+    const tree = document.getElementById('tree');
+
+    // Remove any existing relations section.
+    const existing = tree.querySelector('.tree-section');
+    if (existing) existing.remove();
+
+    if (outgoing.length === 0 && incoming.length === 0) return;
+
+    let html = '<div class="tree-section">';
+
+    if (outgoing.length > 0) {
+        html += `<div class="tree-section-label">Relations →</div>`;
+        html += outgoing.map(r => {
+            const label = labelForHash(r.to) || r.to.slice(0, 12) + '…';
+            return `
+                <div class="tree-item-relation" onclick="navigateToHash('${r.to}')">
+                    <span class="rel-predicate">${escHtml(r.rel)}</span>
+                    <span class="rel-target">${escHtml(label)}</span>
+                </div>`;
+        }).join('');
+    }
+
+    if (incoming.length > 0) {
+        html += `<div class="tree-section-label">← Relations</div>`;
+        html += incoming.map(r => {
+            const label = labelForHash(r.from) || r.from.slice(0, 12) + '…';
+            return `
+                <div class="tree-item-relation" onclick="navigateToHash('${r.from}')">
+                    <span class="rel-predicate">${escHtml(r.rel)}</span>
+                    <span class="rel-target">${escHtml(label)}</span>
+                </div>`;
+        }).join('');
+    }
+
+    html += '</div>';
+    tree.insertAdjacentHTML('beforeend', html);
+}
+
+// ── Map tab (relations treemap) ──
+//
+// Shows the current object's direct relations (outgoing and incoming
+// mixed into one set of tiles) as a treemap, tile area driven by whichever
+// metric is selected. Always one level deep: clicking a tile calls
+// navigateToHash(), the same path the inline tree relation links use,
+// which re-renders the whole app centered on that object — including,
+// since renderEditor() checks currentTab, reloading this treemap centered
+// on the new object. There's no separate "map-local" navigation state to
+// keep in sync with the rest of the app.
+
+let mapMetric = 'fanout'; // 'fanout' | 'recency' | 'tags'
+let mapTiles  = [];       // cached per-neighbor data for the current center, so switching
+                          // metrics re-renders instantly without re-fetching anything
+
+// Per-hash caches for object-meta (tags/created) and neighbor fan-out counts.
+// Safe to cache tags/created indefinitely — Hatcheck's CAS objects are
+// immutable, so a given hash's own metadata never changes after creation.
+// Fan-out is a derived display metric, not something that determines which
+// tiles exist, so a small staleness window there is an acceptable trade for
+// cutting Map's request volume: the old code fired 2 requests per neighbor
+// on every single click, all concurrently via Promise.all, which was enough
+// to blow through the Read rate-limit pool's burst by the very next click —
+// especially revisiting a center or a neighbor already seen this session.
+const objectMetaCache = {}; // hash -> { tags, created }
+const fanOutCache      = {}; // hash -> number
+
+async function getObjectMeta(hash) {
+    if (objectMetaCache[hash]) return objectMetaCache[hash];
+    const res = await apiFetch(`${API}/object-meta?hash=${hash}`);
+    const meta = res.ok ? await res.json() : { tags: [], created: null };
+    objectMetaCache[hash] = meta;
+    return meta;
+}
+
+async function getFanOut(hash) {
+    if (fanOutCache[hash] !== undefined) return fanOutCache[hash];
+    const res = await apiFetch(`${API}/relations?hash=${hash}`);
+    const rel = res.ok ? await res.json() : { outgoing: [], incoming: [] };
+    const fanOut = (rel.outgoing || []).length + (rel.incoming || []).length;
+    fanOutCache[hash] = fanOut;
+    return fanOut;
+}
+
+async function loadMapPanel(hash) {
+    if (!hash) return;
+
+    const treemapEl = document.getElementById('map-treemap');
+    const emptyEl    = document.getElementById('map-empty');
+
+    try {
+        // The center's own relations always need a fresh fetch — this is
+        // what determines the tile set, and could have changed since any
+        // cached view (e.g. a new relation added elsewhere this session).
+        const relRes = await apiFetch(`${API}/relations?hash=${hash}`);
+        if (!relRes.ok) throw new Error('Failed to load relations');
+        const { outgoing, incoming } = await relRes.json();
+        const centerMeta = await getObjectMeta(hash);
+        const centerTags = centerMeta.tags || [];
+
+        // Each relation is its own tile, even if two relations happen to
+        // point at the same neighbor hash — this mirrors the existing
+        // per-object relations list, which also doesn't dedupe by neighbor.
+        const edges = [
+            ...outgoing.map(r => ({ neighborHash: r.to,   rel: r.rel, direction: 'out' })),
+            ...incoming.map(r => ({ neighborHash: r.from, rel: r.rel, direction: 'in'  })),
+        ];
+
+        if (edges.length === 0) {
+            mapTiles = [];
+            treemapEl.innerHTML = '';
+            emptyEl.style.display = '';
+            return;
+        }
+        emptyEl.style.display = 'none';
+
+        // One meta+fan-out lookup per unique neighbor, not per edge — and
+        // now short-circuited to zero network calls for any neighbor whose
+        // data is already cached from an earlier Map view this session.
+        const neighborHashes = [...new Set(edges.map(e => e.neighborHash))];
+        const neighborData = {};
+        await Promise.all(neighborHashes.map(async (nh) => {
+            const [nMeta, fanOut] = await Promise.all([
+                getObjectMeta(nh),
+                getFanOut(nh),
+            ]);
+            const overlap = (nMeta.tags || []).filter(t => centerTags.includes(t)).length;
+            neighborData[nh] = {
+                fanOut,
+                created: nMeta.created ? new Date(nMeta.created) : null,
+                tagOverlap: overlap,
+            };
+        }));
+
+        mapTiles = edges.map(e => {
+            const known = namesByHash[e.neighborHash];
+            const label = known ? known.label : e.neighborHash.slice(0, 8) + '…';
+            return {
+                hash: e.neighborHash,
+                rel: e.rel,
+                direction: e.direction,
+                label,
+                ...neighborData[e.neighborHash],
+            };
+        });
+
+        renderMapTreemap();
+    } catch (err) {
+        showToast('Error', err.message, true);
+    }
+}
+
+function setMapMetric(metric) {
+    mapMetric = metric;
+    ['fanout', 'recency', 'tags'].forEach(m => {
+        document.getElementById('map-metric-' + m).classList.toggle('active', m === metric);
+    });
+    renderMapTreemap();
+}
+
+// weightFor returns this tile's raw (unnormalized) size driver for the
+// currently selected metric. Every metric gets a +1 floor so a tile with
+// "nothing" for that metric (0 fan-out, 0 tag overlap) still renders at a
+// small but visible size rather than collapsing to zero area.
+function weightFor(tile, metric, recencyRange) {
+    if (metric === 'fanout') return tile.fanOut + 1;
+    if (metric === 'tags') return tile.tagOverlap + 1;
+    if (metric === 'recency') {
+        if (!tile.created || !recencyRange || recencyRange.span <= 0) return 1;
+        // Normalize within this neighbor set specifically — raw epoch
+        // timestamps are all so close together (relative to their own
+        // magnitude) that tile sizes would look nearly identical otherwise.
+        const age = tile.created.getTime() - recencyRange.min;
+        return (age / recencyRange.span) * 9 + 1; // scale to roughly 1..10
+    }
+    return 1;
+}
+
+function renderMapTreemap() {
+    const treemapEl = document.getElementById('map-treemap');
+    if (mapTiles.length === 0) return;
+
+    let recencyRange = null;
+    if (mapMetric === 'recency') {
+        const times = mapTiles.filter(t => t.created).map(t => t.created.getTime());
+        if (times.length > 0) {
+            const min = Math.min(...times), max = Math.max(...times);
+            recencyRange = { min, span: max - min };
+        }
+    }
+
+    const weights = mapTiles.map(t => weightFor(t, mapMetric, recencyRange));
+    const rects = computeTreemapLayout(weights, 1000, 1000); // logical unit space; positioned as %
+
+    treemapEl.innerHTML = mapTiles.map((tile, i) => {
+        const r = rects[i];
+        if (!r) return '';
+        const style = `left:${r.x / 10}%; top:${r.y / 10}%; width:${r.w / 10}%; height:${r.h / 10}%;`;
+        // Smaller tiles get smaller, less verbose labels — a tile a few
+        // percent of the total area can't usefully show both the relation
+        // type and a long title.
+        const area = r.w * r.h;
+        const fontSize = Math.max(10, Math.min(14, 10 + area / 20000));
+        return `
+            <div class="map-tile map-tile-${tile.direction}" style="${style} font-size:${fontSize}px"
+                 onclick="navigateToHash('${escAttr(tile.hash)}')"
+                 title="${tile.direction === 'out' ? '→' : '←'} ${escHtml(tile.rel)} ${escHtml(tile.label)}">
+                <div class="map-tile-rel">${tile.direction === 'out' ? '→' : '←'} ${escHtml(tile.rel)}</div>
+                <div class="map-tile-label">${escHtml(tile.label)}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// computeTreemapLayout implements the "squarified" treemap algorithm
+// (Bruls, Huizing & van Wijk, 1999) for a flat (non-hierarchical) list of
+// weights, laying them out to fill a containerW x containerH rectangle
+// while keeping individual tiles as close to square as the weights allow
+// (rather than, say, one degenerate sliver per item). Returns an array of
+// {x, y, w, h} in the same order as weights.
+function computeTreemapLayout(weights, containerW, containerH) {
+    const total = weights.reduce((a, b) => a + b, 0);
+    if (total <= 0 || weights.length === 0) return [];
+
+    const totalArea = containerW * containerH;
+    const items = weights.map((w, i) => ({ area: (w / total) * totalArea, i }));
+    const rects = new Array(items.length);
+
+    let x = 0, y = 0, w = containerW, h = containerH;
+    let remaining = items.slice();
+
+    function worst(row, length) {
+        const sum  = row.reduce((a, b) => a + b.area, 0);
+        const rmax = Math.max(...row.map(r => r.area));
+        const rmin = Math.min(...row.map(r => r.area));
+        const s2 = sum * sum;
+        return Math.max((length * length * rmax) / s2, s2 / (length * length * rmin));
+    }
+
+    // wide: the remaining rectangle is wider than it is tall, so the next
+    // row is cut as a *vertical* strip from the left edge (thickness =
+    // strip width, consumed from w), with items inside it stacked
+    // top-to-bottom. The opposite case cuts a horizontal strip from the
+    // top instead (thickness = strip height, consumed from h), with items
+    // stacked left-to-right. Either way, "length" is the side the row's
+    // items are laid out along — always the *shorter* side of what's left,
+    // which is what keeps tiles closer to square.
+    function layoutRow(row, length, wide) {
+        const sum = row.reduce((a, b) => a + b.area, 0);
+        const thickness = sum / length;
+        let offset = 0;
+        row.forEach(r => {
+            const itemLength = r.area / thickness;
+            if (wide) {
+                rects[r.i] = { x: x, y: y + offset, w: thickness, h: itemLength };
+            } else {
+                rects[r.i] = { x: x + offset, y: y, w: itemLength, h: thickness };
+            }
+            offset += itemLength;
+        });
+        return thickness;
+    }
+
+    while (remaining.length > 0) {
+        const wide = w >= h;
+        const length = wide ? h : w;
+        let row = [remaining[0]];
+        let i = 1;
+        while (i < remaining.length) {
+            const candidate = row.concat([remaining[i]]);
+            if (worst(candidate, length) <= worst(row, length)) {
+                row = candidate;
+                i++;
+            } else {
+                break;
+            }
+        }
+        const thickness = layoutRow(row, length, wide);
+        if (wide) {
+            x += thickness;
+            w -= thickness;
+        } else {
+            y += thickness;
+            h -= thickness;
+        }
+        remaining = remaining.slice(row.length);
+        // Degenerate guard: if the remaining rectangle has collapsed to
+        // nothing (can happen with floating-point weights summing right
+        // at the edge), stop rather than looping on a zero-size remainder.
+        if (w <= 0 || h <= 0) break;
+    }
+
+    return rects;
+}
+
+// Navigate to an object by hash — look it up in nameList first, then descend.
+async function navigateToHash(hash) {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    // Find a name for this hash in the current namespace.
+    const entry = nameList.find(n => n.hash === hash);
+    if (entry) {
+        await selectName(entry.label, hash);
+        return;
+    }
+
+    // Not in current namespace — navigate directly by hash without a name frame.
+    pathStack = [{ type: 'name', label: hash.slice(0, 8) + '…', hash, members: null, index: null }];
+    currentLabel = null;
+    editorDirty  = false;
+    await descend(hash);
+}
+
+// Resolve a hash to a label from the current nameList.
+function labelForHash(hash) {
+    const entry = nameList.find(n => n.hash === hash);
+    return entry ? entry.label : null;
+}
+
+// ── Rel-type autocomplete ──
+
+async function fetchTags() {
+    if (allTags.length > 0) return; // cached
+    try {
+        const res = await apiFetch(`${API}/tags`);
+        if (res.ok) allTags = await res.json();
+    } catch(e) {}
+}
+
+function onRelTypeFocus() {
+    fetchTags().then(() => renderRelTypeDropdown(document.getElementById('rel-type-input').value));
+}
+
+function onRelTypeInput(val) {
+    relTypeSelected = -1;
+    renderRelTypeDropdown(val);
+}
+
+function renderRelTypeDropdown(val) {
+    const dropdown = document.getElementById('rel-type-dropdown');
+    const filtered = val
+        ? allTags.filter(t => t.toLowerCase().startsWith(val.toLowerCase()))
+        : allTags;
+
+    if (filtered.length === 0) {
+        dropdown.classList.remove('visible');
+        return;
+    }
+
+    dropdown.innerHTML = filtered.map((t, i) => `
+        <div class="rel-ac-option ${i === relTypeSelected ? 'selected' : ''}"
+             onmousedown="selectRelType('${escAttr(t)}')">
+            ${escHtml(t)}
+        </div>
+    `).join('');
+    dropdown.classList.add('visible');
+}
+
+function selectRelType(tag) {
+    document.getElementById('rel-type-input').value = tag;
+    document.getElementById('rel-type-dropdown').classList.remove('visible');
+    updateCreateBtn();
+}
+
+function onRelTypeBlur() {
+    setTimeout(() => {
+        document.getElementById('rel-type-dropdown').classList.remove('visible');
+    }, 150);
+}
+
+function onRelTypeKey(e) {
+    const dropdown = document.getElementById('rel-type-dropdown');
+    const options  = dropdown.querySelectorAll('.rel-ac-option');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        relTypeSelected = Math.min(relTypeSelected + 1, options.length - 1);
+        renderRelTypeDropdown(document.getElementById('rel-type-input').value);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        relTypeSelected = Math.max(relTypeSelected - 1, -1);
+        renderRelTypeDropdown(document.getElementById('rel-type-input').value);
+    } else if (e.key === 'Enter') {
+        if (relTypeSelected >= 0 && options[relTypeSelected]) {
+            selectRelType(options[relTypeSelected].textContent.trim());
+        }
+        dropdown.classList.remove('visible');
+    } else if (e.key === 'Escape') {
+        dropdown.classList.remove('visible');
+    } else if (e.key === 'Tab') {
+        dropdown.classList.remove('visible');
+    }
+}
+
+// ── To-object search autocomplete ──
+
+// Fetch all names across all namespaces for object search.
+// We include the current namespace names plus any others already loaded.
+async function fetchAllNames() {
+    // Always use current namespace; expand later if needed.
+    allNamesFlat = [...nameList].map(n => ({ label: n.label, hash: n.hash }));
+}
+
+function onRelToFocus() {
+    fetchAllNames().then(() => renderRelToDropdown(document.getElementById('rel-to-input').value));
+}
+
+function onRelToInput(val) {
+    relToSelected = -1;
+    // Clear previous selection when user types again.
+    relToHash  = null;
+    relToLabel = null;
+    hideRelPreview();
+    renderRelToDropdown(val);
+    updateCreateBtn();
+}
+
+function renderRelToDropdown(val) {
+    const dropdown = document.getElementById('rel-to-dropdown');
+    const filtered = val
+        ? allNamesFlat.filter(n => n.label.toLowerCase().includes(val.toLowerCase()))
+        : allNamesFlat;
+
+    if (filtered.length === 0) {
+        dropdown.classList.remove('visible');
+        return;
+    }
+
+    dropdown.innerHTML = filtered.map((n, i) => `
+        <div class="rel-ac-option ${i === relToSelected ? 'selected' : ''}"
+             onmousedown="selectRelTarget('${escAttr(n.label)}', '${escAttr(n.hash)}')">
+            ${escHtml(n.label)}
+        </div>
+    `).join('');
+    dropdown.classList.add('visible');
+}
+
+async function selectRelTarget(label, hash) {
+    relToHash  = hash;
+    relToLabel = label;
+
+    document.getElementById('rel-to-input').value = label;
+    document.getElementById('rel-to-dropdown').classList.remove('visible');
+    updateCreateBtn();
+
+    // Fetch and show inline preview.
+    try {
+        const res = await apiFetch(`${API}/fetch?hash=${hash}`);
+        if (!res.ok) throw new Error('fetch failed');
+        const content = (await res.text()).trimEnd();
+        showRelPreview(label, content);
+    } catch(e) {
+        hideRelPreview();
+    }
+}
+
+function showRelPreview(label, content) {
+    document.getElementById('rel-preview-label').textContent = label;
+    document.getElementById('rel-preview-content').textContent = content;
+    document.getElementById('rel-preview').classList.add('visible');
+}
+
+function hideRelPreview() {
+    document.getElementById('rel-preview').classList.remove('visible');
+}
+
+function onRelToBlur() {
+    setTimeout(() => {
+        document.getElementById('rel-to-dropdown').classList.remove('visible');
+    }, 150);
+}
+
+function onRelToKey(e) {
+    const dropdown = document.getElementById('rel-to-dropdown');
+    const options  = dropdown.querySelectorAll('.rel-ac-option');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        relToSelected = Math.min(relToSelected + 1, options.length - 1);
+        renderRelToDropdown(document.getElementById('rel-to-input').value);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        relToSelected = Math.max(relToSelected - 1, -1);
+        renderRelToDropdown(document.getElementById('rel-to-input').value);
+    } else if (e.key === 'Enter') {
+        if (relToSelected >= 0 && options[relToSelected]) {
+            const opt = allNamesFlat.filter(n => {
+                const val = document.getElementById('rel-to-input').value;
+                return val ? n.label.toLowerCase().includes(val.toLowerCase()) : true;
+            })[relToSelected];
+            if (opt) selectRelTarget(opt.label, opt.hash);
+        }
+        dropdown.classList.remove('visible');
+    } else if (e.key === 'Escape') {
+        dropdown.classList.remove('visible');
+    } else if (e.key === 'Tab') {
+        dropdown.classList.remove('visible');
+    }
+}
+
+// Enable create button only when all three fields are valid.
+function updateCreateBtn() {
+    const relType = document.getElementById('rel-type-input').value.trim();
+    const btn     = document.getElementById('rel-create-btn');
+    btn.disabled  = !(currentHash && relType && relToHash);
+}
+
+// ── Create relation ──
+async function createRelation() {
+    const rel = document.getElementById('rel-type-input').value.trim();
+    if (!currentHash || !rel || !relToHash) return;
+
+    const btn = document.getElementById('rel-create-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+
+    try {
+        // relationHandler expects a JSON body — {"from":..., "rel":...,
+        // "to":...} — not query params. This previously sent from/rel/to
+        // as query params with an empty body, which always 400'd against
+        // the current server-side handler.
+        const res = await apiFetch(`${API}/relation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: currentHash, rel, to: relToHash }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const relData = await res.json();
+        const hash = relData.hash;
+
+        // Store the capability issued for this relation object.
+        if (relData.capability) {
+            const caps = JSON.parse(sessionStorage.getItem('capabilities') || '{}');
+            caps[hash] = relData.capability;
+            sessionStorage.setItem('capabilities', JSON.stringify(caps));
+            if (!browseCapToken) {
+                browseCapToken = JSON.stringify(relData.capability);
+                sessionStorage.setItem('browse_cap_token', browseCapToken);
+            }
+        }
+
+        showToast('Relation created', hash);
+        resetRelForm();
+
+        // Refresh relations display.
+        await loadRelationsPanel(currentHash);
+
+    } catch(err) {
+        showToast('Error', err.message, true);
+    } finally {
+        btn.textContent = 'Create relation';
+        updateCreateBtn();
+    }
+}
+
+function resetRelForm() {
+    document.getElementById('rel-type-input').value = '';
+    document.getElementById('rel-to-input').value   = '';
+    relToHash  = null;
+    relToLabel = null;
+    relTypeSelected = -1;
+    relToSelected   = -1;
+    hideRelPreview();
+    updateCreateBtn();
+}
+
+// ── Collection builder ──
+// Unlike Relations (a property of whatever object is currently open),
+// building a Collection means composing several existing objects into a
+// new one — there's no single "current object" it's a property of. So
+// this is a mode entered via the header button, replacing the whole
+// tab-strip/editor/relations area rather than living alongside it as a
+// third tab. Reuses the same allNamesFlat + .rel-ac-* search/dropdown
+// pattern Relations' "to" picker already established, just for adding
+// members instead of picking a relation target.
+let cbMembers = []; // ordered [{label, hash}, ...]
+
+function newCollection() {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    cbMembers = [];
+    document.getElementById('cb-add-input').value = '';
+    renderCbMembers();
+
+    document.getElementById('tab-strip').style.display = 'none';
+    document.getElementById('editor-header').style.display = 'none';
+    document.querySelector('.tab-panels').style.display = 'none';
+    document.getElementById('collection-builder-view').style.display = 'flex';
+
+    pathStack    = [];
+    currentHash  = null;
+    currentLabel = null;
+    editorDirty  = false;
+    renderBreadcrumb();
+
+    showToast('New collection', 'Search for objects above to add them, in order.');
+}
+
+function cancelCollectionBuilder() {
+    document.getElementById('collection-builder-view').style.display = 'none';
+    document.getElementById('tab-strip').style.display = '';
+    document.querySelector('.tab-panels').style.display = '';
+    switchTab('editor'); // also restores editor-header's visibility correctly
+}
+
+function onCbAddFocus() {
+    fetchAllNames().then(() => renderCbAddDropdown(document.getElementById('cb-add-input').value));
+}
+
+function onCbAddInput(val) {
+    renderCbAddDropdown(val);
+}
+
+function onCbAddBlur() {
+    setTimeout(() => {
+        document.getElementById('cb-add-dropdown').classList.remove('visible');
+    }, 150);
+}
+
+function renderCbAddDropdown(val) {
+    const dropdown = document.getElementById('cb-add-dropdown');
+    const filtered = val
+        ? allNamesFlat.filter(n => n.label.toLowerCase().includes(val.toLowerCase()))
+        : allNamesFlat;
+
+    if (filtered.length === 0) {
+        dropdown.classList.remove('visible');
+        return;
+    }
+
+    dropdown.innerHTML = filtered.map(n => `
+        <div class="rel-ac-option" onmousedown="addCbMember('${escAttr(n.label)}', '${escAttr(n.hash)}')">
+            ${escHtml(n.label)}
+        </div>
+    `).join('');
+    dropdown.classList.add('visible');
+}
+
+// Duplicates are allowed on purpose — a Collection is just a JSON array
+// of hashes, and there's no reason the same object couldn't legitimately
+// appear more than once (e.g. repeating an image).
+function addCbMember(label, hash) {
+    cbMembers.push({ label, hash });
+    document.getElementById('cb-add-input').value = '';
+    document.getElementById('cb-add-dropdown').classList.remove('visible');
+    renderCbMembers();
+}
+
+function renderCbMembers() {
+    const container = document.getElementById('cb-members');
+    const createBtn = document.getElementById('cb-create-btn');
+    createBtn.disabled = cbMembers.length === 0;
+    createBtn.textContent = cbMembers.length
+        ? `Create collection (${cbMembers.length} member${cbMembers.length !== 1 ? 's' : ''})`
+        : 'Create collection';
+
+    if (!cbMembers.length) {
+        container.innerHTML = '<div class="empty-state">No members yet — search above to add objects.</div>';
+        return;
+    }
+
+    container.innerHTML = cbMembers.map((m, i) => `
+        <div class="cb-member-row">
+            <span class="cb-member-index">${i + 1}</span>
+            <span class="cb-member-label" title="${escAttr(m.hash)}">${escHtml(m.label)}</span>
+            <div class="cb-member-btns">
+                <button class="cb-member-btn" onclick="moveCbMember(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+                <button class="cb-member-btn" onclick="moveCbMember(${i}, 1)" ${i === cbMembers.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+                <button class="cb-member-btn" onclick="removeCbMember(${i})" title="Remove">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function moveCbMember(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= cbMembers.length) return;
+    [cbMembers[index], cbMembers[newIndex]] = [cbMembers[newIndex], cbMembers[index]];
+    renderCbMembers();
+}
+
+function removeCbMember(index) {
+    cbMembers.splice(index, 1);
+    renderCbMembers();
+}
+
+async function createCollection() {
+    if (!namespace) {
+        showToast('Error', 'Enter a namespace first', true);
+        return;
+    }
+    if (!cbMembers.length) return;
+
+    const btn = document.getElementById('cb-create-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+
+    try {
+        const hashes = cbMembers.map(m => m.hash);
+        const res = await apiFetch(`${API}/collection`, {
+            method: 'POST',
+            body: JSON.stringify(hashes),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        const hash = data.hash;
+
+        // Store the capability issued for this collection object — same
+        // pattern saveContent() and createRelation() already use.
+        if (data.capability) {
+            const caps = JSON.parse(sessionStorage.getItem('capabilities') || '{}');
+            caps[hash] = data.capability;
+            sessionStorage.setItem('capabilities', JSON.stringify(caps));
+            capabilityToken = JSON.stringify(data.capability);
+            sessionStorage.setItem('capability_token', capabilityToken);
+            if (!browseCapToken) {
+                browseCapToken = capabilityToken;
+                sessionStorage.setItem('browse_cap_token', browseCapToken);
+            }
+        }
+
+        const label = prompt('Enter a name for this collection:');
+        if (!label) {
+            // Same choice saveContent() makes for an unnamed save: the
+            // object exists in the CAS either way, naming it is optional.
+            showToast('Collection created', `Hash: ${hash} (not named yet)`);
+            cancelCollectionBuilder();
+            return;
+        }
+
+        const nameRes = await apiFetch(
+            `${API}/name?namespace=${encodeURIComponent(namespace)}&label=${encodeURIComponent(label)}&hash=${hash}`,
+            { method: 'POST' }
+        );
+        if (!nameRes.ok) throw new Error('Name creation failed');
+
+        const listRes = await apiFetch(`${API}/names?namespace=${encodeURIComponent(namespace)}`);
+        nameList = await listRes.json();
+
+        showToast('Collection created', `${label} (${cbMembers.length} member${cbMembers.length !== 1 ? 's' : ''})`);
+
+        cancelCollectionBuilder();
+        renderNameList();
+        await navigateToHash(hash); // land on the new collection so it's visibly confirmed, not just a toast
+
+    } catch (err) {
+        showToast('Error', err.message, true);
+        btn.disabled = false;
+        btn.textContent = `Create collection (${cbMembers.length} member${cbMembers.length !== 1 ? 's' : ''})`;
+    }
+}
+
+// ── New object ──
+function newObject() {
+    if (editorDirty && !confirm('You have unsaved changes. Continue?')) return;
+
+    pathStack    = [];
+    currentHash  = null;
+    currentLabel = null;
+    editorDirty  = false;
+    renderBreadcrumb();
+    renderEditor(null, '');
+    switchTab('editor');
+    document.getElementById('save-btn').disabled = false;
+    document.getElementById('editor').focus();
+    showToast('New object', 'Write content and click Save to stash it.');
+}
+
+// ── Save (path copying) ──
+async function saveContent() {
+    if (!namespace) {
+        showToast('Error', 'Enter a namespace first', true);
+        return;
+    }
+    const content = document.getElementById('editor').value;
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    try {
+        const stashRes = await apiFetch(`${API}/stash`, { method: 'POST', body: content });
+        if (!stashRes.ok) throw new Error('Stash failed');
+        const stashData = await stashRes.json();
+        let newHash = stashData.hash;
+
+        // Store the capability issued by the server for this object.
+        // This binds ownership to the current user.
+        if (stashData.capability) {
+            const caps = JSON.parse(sessionStorage.getItem('capabilities') || '{}');
+            caps[newHash] = stashData.capability;
+            sessionStorage.setItem('capabilities', JSON.stringify(caps));
+            // Update active capability token to the one just issued.
+            capabilityToken = JSON.stringify(stashData.capability);
+            sessionStorage.setItem('capability_token', capabilityToken);
+            // Seed the browse capability if we don't have one yet.
+            // Any valid capability satisfies the PermRead check on metadata endpoints.
+            if (!browseCapToken) {
+                browseCapToken = capabilityToken;
+                sessionStorage.setItem('browse_cap_token', browseCapToken);
+            }
+        }
+        for (let i = pathStack.length - 2; i >= 1; i--) {
+            const parentFrame    = pathStack[i];
+            const childIndex     = pathStack[i].index;
+            const updatedMembers = [...parentFrame.members];
+            updatedMembers[childIndex] = newHash;
+
+            const colRes = await apiFetch(`${API}/collection`, {
+                method: 'POST',
+                body: JSON.stringify(updatedMembers),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!colRes.ok) throw new Error('Collection stash failed');
+            const colData = await colRes.json();
+            newHash = colData.hash;
+
+            // Store the capability issued for this collection object.
+            if (colData.capability) {
+                const caps = JSON.parse(sessionStorage.getItem('capabilities') || '{}');
+                caps[newHash] = colData.capability;
+                sessionStorage.setItem('capabilities', JSON.stringify(caps));
+                if (!browseCapToken) {
+                    browseCapToken = JSON.stringify(colData.capability);
+                    sessionStorage.setItem('browse_cap_token', browseCapToken);
+                }
+            }
+        }
+
+        if (pathStack.length > 0) {
+            const nameFrame = pathStack[0];
+            const label     = nameFrame.label;
+            const nameRes   = await apiFetch(
+                `${API}/name?namespace=${encodeURIComponent(namespace)}&label=${encodeURIComponent(label)}&hash=${newHash}`,
+                { method: 'POST' }
+            );
+            if (!nameRes.ok) throw new Error('Name update failed');
+            currentLabel = label;
+        } else {
+            const label = prompt('Enter a name for this object:');
+            if (!label) {
+                showToast('Saved', `Hash: ${newHash}`);
+                renderEditor(newHash, content);
+                return;
+            }
+            const nameRes = await apiFetch(
+                `${API}/name?namespace=${encodeURIComponent(namespace)}&label=${encodeURIComponent(label)}&hash=${newHash}`,
+                { method: 'POST' }
+            );
+            if (!nameRes.ok) throw new Error('Name creation failed');
+            currentLabel = label;
+
+            const listRes = await apiFetch(`${API}/names?namespace=${encodeURIComponent(namespace)}`);
+            nameList = await listRes.json();
+        }
+
+        currentHash = newHash;
+        editorDirty = false;
+        renderEditor(newHash, content);
+        renderBreadcrumb();
+
+        const listRes = await apiFetch(`${API}/names?namespace=${encodeURIComponent(namespace)}`);
+        nameList = await listRes.json();
+        renderNameList();
+
+        showToast('Saved', newHash);
+
+    } catch (err) {
+        showToast('Error', err.message, true);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+    }
+}
+
+// ── Breadcrumb ──
+function renderBreadcrumb() {
+    const el = document.getElementById('breadcrumb');
+
+    if (pathStack.length === 0) {
+        el.innerHTML = `<span style="color:var(--text-muted);font-size:11px">${namespace || 'No selection'}</span>`;
+        return;
+    }
+
+    // Intermediate frames are almost always anonymous path-copy wrapper
+    // collections (see the Path Copying architecture note) with no name of
+    // their own, so a deep drill-down used to render as a wall of hash
+    // segments. Show only the root (named) frame and the current position;
+    // clicking the root still jumps straight back to it via navigateTo(0).
+    const rootIdx = 0;
+    const lastIdx = pathStack.length - 1;
+    const indices = lastIdx === rootIdx ? [rootIdx] : [rootIdx, lastIdx];
+
+    const parts = indices.map((i) => {
+        const frame = pathStack[i];
+        const isLast = i === lastIdx;
+        if (isLast) {
+            return `<span class="crumb-current">${escHtml(frame.label)}</span>`;
+        }
+        return `<span class="crumb" onclick="navigateTo(${i})">${escHtml(frame.label)}</span>`;
+    });
+
+    const ns = namespace
+        ? `<span class="crumb" onclick="loadNamespace()">${escHtml(namespace)}</span><span class="crumb-sep"> / </span>`
+        : '';
+
+    el.innerHTML = ns + parts.join('<span class="crumb-sep"> / </span>');
+}
+
+// ── Export ──
+// Exports the whole current namespace as a tar.gz archive — every name
+// currently defined in it, and everything reachable from those names.
+// Previously this button ("Share") exported just the single open
+// document; it now covers the whole namespace, so it lives in the top
+// toolbar rather than the per-document editor header, and only needs a
+// namespace loaded rather than a document open.
+async function exportNamespace() {
+    if (!namespace) return;
+
+    const url = `${API}/export?source=${encodeURIComponent(namespace)}&namespace=${encodeURIComponent(namespace)}`;
+
+    // A plain <a href="..."> navigation sends no custom headers at all —
+    // not Authorization, not X-User-ID, not X-Capability-Token — so it
+    // always 401s against an auth-gated endpoint regardless of who's
+    // asking. Fetch it through apiFetch (which attaches those headers)
+    // and download the resulting blob instead.
+    try {
+        const res = await apiFetch(url);
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = namespace + '.tar.gz';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+
+        showToast('Exported', `${namespace} → ${namespace}.tar.gz`);
+    } catch (err) {
+        showToast('Export failed', err.message, true);
+    }
+}
+
+// ── Import ──
+function triggerImport() {
+    document.getElementById('import-file-input').click();
+}
+
+async function handleImportFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    input.value = '';
+    showToast('Importing', file.name);
+
+    try {
+        const res = await apiFetch(`${API}/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/gzip' },
+            body: file,
+        });
+
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg);
+        }
+
+        const prevNamespaces = [...allNamespaces];
+        await fetchNamespaces();
+        const newNs = allNamespaces.find(ns => !prevNamespaces.includes(ns));
+
+        if (newNs) {
+            document.getElementById('ns-input').value = newNs;
+            namespace = newNs;
+            await loadNamespace();
+            showToast('Imported', `Switched to namespace: ${newNs}`);
+        } else {
+            showToast('Imported', file.name);
+        }
+
+    } catch (err) {
+        showToast('Import failed', err.message, true);
+    }
+}
+
+// ── Helpers ──
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escAttr(str) {
+    return String(str).replace(/'/g, "\\'");
+}
+
+// ── Keyboard nav: namespace input ──
+document.getElementById('ns-input').addEventListener('keydown', e => {
+    const dropdown = document.getElementById('ns-dropdown');
+    const options  = dropdown.querySelectorAll('.ns-option');
+
+    if (e.key === 'Enter') {
+        if (nsSelectedIndex >= 0 && options[nsSelectedIndex]) {
+            selectNamespace(options[nsSelectedIndex].textContent.trim());
+        } else {
+            loadNamespace();
+        }
+        dropdown.classList.remove('visible');
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        nsSelectedIndex = Math.min(nsSelectedIndex + 1, options.length - 1);
+        renderNsDropdown(document.getElementById('ns-input').value);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        nsSelectedIndex = Math.max(nsSelectedIndex - 1, -1);
+        renderNsDropdown(document.getElementById('ns-input').value);
+    } else if (e.key === 'Escape') {
+        dropdown.classList.remove('visible');
+    }
+});
+</script>
+</body>
+</html>
