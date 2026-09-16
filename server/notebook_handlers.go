@@ -118,6 +118,35 @@ func parseMergedPostsHeader(header string) []string {
 	return hashes
 }
 
+// createPlainPostHandler handles POST /posts — a generic post with no
+// forced tag, for the quick-compose editor shown when no notebook is open.
+func createPlainPostHandler(svc *notebook.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		auth, ok := authFromRequest(req)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "missing or malformed Authorization header")
+			return
+		}
+
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "could not read request body")
+			return
+		}
+		if len(body) == 0 {
+			writeError(w, http.StatusBadRequest, "post content is required")
+			return
+		}
+
+		post, err := svc.CreatePlainPost(req.Context(), auth, string(body))
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, post)
+	}
+}
+
 // createPostHandler handles POST /notebook/{tag}/posts — the request body
 // is the new post's content.
 func createPostHandler(svc *notebook.Service) http.HandlerFunc {

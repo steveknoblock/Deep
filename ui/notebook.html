@@ -73,13 +73,15 @@
         .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
         .btn-primary:hover:not(:disabled) { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
 
-        .known-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-        .tag-pill {
-            font-size: 11px; font-family: var(--mono); color: var(--text-dim);
-            border: 1px solid var(--border); padding: 3px 9px; cursor: pointer; transition: all 0.15s;
+        .home-tags-list { flex: 1; overflow-y: auto; margin-top: 6px; }
+        .home-tags-empty { color: var(--text-muted); font-size: 12px; padding: 10px 0; }
+        .home-tag-item {
+            display: block; width: 100%; text-align: left;
+            font-size: 13px; font-family: var(--mono); color: var(--text);
+            background: transparent; border: none; border-bottom: 1px solid var(--border);
+            padding: 10px 4px; cursor: pointer; transition: all 0.15s;
         }
-        .tag-pill:hover { color: var(--accent); border-color: var(--accent); }
-        .tag-pill.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+        .home-tag-item:hover { color: var(--accent); background: var(--surface2); }
 
         /* ── Empty / signed-out states ── */
         .empty-state {
@@ -203,17 +205,39 @@
 </header>
 
 <div class="tag-bar" id="tag-bar" style="display:none;">
+    <button class="btn" id="home-btn" onclick="showHome()" title="Back to all notebooks" style="display:none;">&#8962; All notebooks</button>
     <div class="tag-input-wrap">
         <input class="tag-input" id="tag-input" type="text" placeholder="tag"
                onkeydown="if(event.key==='Enter') openTagFromInput()">
         <button class="btn btn-primary" onclick="openTagFromInput()">Open</button>
     </div>
-    <div class="known-tags" id="known-tags"></div>
 </div>
 
-<div class="empty-state" id="empty-state">Enter a tag above to open its notebook.</div>
+<div class="empty-state" id="signed-out-state" style="display:none;"></div>
 
-<section class="flow-wrap" id="flow-wrap">
+<!-- Shown when no notebook is open: a scrollable list of known tags on the
+     left, and a quick-compose editor on the right so the user can just
+     start typing without opening any particular notebook first. Shares
+     the .flow-wrap layout (grid + draggable divider) with the notebook
+     view below purely for visual and structural consistency. -->
+<section class="flow-wrap active" id="home-view">
+    <section class="flow-sticky" id="home-tags-panel">
+        <span class="flow-tag">Notebooks</span>
+        <div class="home-tags-list" id="home-tags"></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-scroll" id="home-editor-panel">
+        <textarea class="doc-textarea" id="quick-editor" placeholder="Just start typing… use #hashtags to tag it."></textarea>
+        <div class="doc-footer">
+            <span class="doc-status" id="quick-status"></span>
+            <button class="btn btn-primary" onclick="postQuickNote()">Post</button>
+        </div>
+    </section>
+</section>
+
+<section class="flow-wrap" id="notebook-view">
     <section class="flow-sticky" id="flow-left">
         <span class="flow-tag" id="doc-tag-label"></span>
         <textarea class="doc-textarea" id="doc-textarea" placeholder="Notebook document — Markdown source."></textarea>
@@ -223,7 +247,7 @@
         </div>
     </section>
 
-    <div class="divider" id="divider"></div>
+    <div class="divider"></div>
 
     <section class="flow-scroll" id="flow-right">
         <div class="composer">
@@ -277,13 +301,18 @@ function updateAuthUI() {
     const loggedIn = !!sessionJWT;
     document.getElementById('tag-bar').style.display = loggedIn ? '' : 'none';
     document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
-    document.getElementById('flow-wrap').classList.remove('active');
+    document.getElementById('notebook-view').classList.remove('active');
+    document.getElementById('home-btn').style.display = 'none';
 
-    const emptyState = document.getElementById('empty-state');
-    emptyState.style.display = 'flex';
-    emptyState.innerHTML = loggedIn
-        ? 'Enter a tag above to open its notebook.'
-        : 'Not signed in. <a href="http://localhost:8090/ui/index.html">Sign in on Hatcheck</a>, then open Notebook from there.';
+    const signedOut = document.getElementById('signed-out-state');
+    if (loggedIn) {
+        signedOut.style.display = 'none';
+        showHome();
+    } else {
+        signedOut.style.display = 'flex';
+        signedOut.innerHTML = 'Not signed in. <a href="http://localhost:8090/ui/index.html">Sign in on Hatcheck</a>, then open Notebook from there.';
+        document.getElementById('home-view').classList.remove('active');
+    }
 }
 
 function logout() {
@@ -324,15 +353,18 @@ async function loadKnownTags() {
         const res = await apiFetch(`${API}/notebooks`);
         if (!res.ok) return;
         const tags = await res.json();
-        const container = document.getElementById('known-tags');
+        const container = document.getElementById('home-tags');
+        if (!tags || tags.length === 0) {
+            container.innerHTML = '<div class="home-tags-empty">No notebooks yet — post something with a #tag to start one.</div>';
+            return;
+        }
         container.innerHTML = '';
-        (tags || []).forEach(tag => {
-            const pill = document.createElement('span');
-            pill.className = 'tag-pill' + (tag === currentTag ? ' active' : '');
-            pill.textContent = '#' + tag;
-            pill.title = 'Open notebook for #' + tag;
-            pill.onclick = () => openTag(tag);
-            container.appendChild(pill);
+        tags.forEach(tag => {
+            const item = document.createElement('button');
+            item.className = 'home-tag-item';
+            item.textContent = '#' + tag;
+            item.onclick = () => openTag(tag);
+            container.appendChild(item);
         });
     } catch (err) {
         // Ambient listing failure isn't fatal — the tag input still works.
@@ -343,6 +375,41 @@ function openTagFromInput() {
     const tag = document.getElementById('tag-input').value.trim().replace(/^#/, '');
     if (!tag) return;
     openTag(tag);
+}
+
+// Returns to the home view (tag list + quick editor), closing whatever
+// notebook is currently open.
+function showHome() {
+    currentTag = '';
+    document.getElementById('tag-input').value = '';
+    document.getElementById('notebook-view').classList.remove('active');
+    document.getElementById('home-view').classList.add('active');
+    document.getElementById('home-btn').style.display = 'none';
+    loadKnownTags();
+}
+
+// Posts whatever's in the quick-compose editor with no forced tag — the
+// point is to let the user just start typing without opening a notebook
+// first. If the text happens to mention a tag, it'll show up in that
+// tag's stream next time it's opened; nothing extra is needed for that.
+async function postQuickNote() {
+    const textarea = document.getElementById('quick-editor');
+    const content = textarea.value.trim();
+    if (!content) return;
+
+    const status = document.getElementById('quick-status');
+    status.textContent = 'Posting…';
+    try {
+        const res = await apiFetch(`${API}/posts`, { method: 'POST', body: content });
+        if (!res.ok) throw new Error(await res.text());
+        textarea.value = '';
+        status.textContent = 'Posted.';
+        showToast('Posted', 'Saved to Hatcheck.');
+        loadKnownTags(); // a new tag mentioned inline could mean a new notebook now exists
+    } catch (err) {
+        status.textContent = 'Failed to post.';
+        showToast('Post failed', err.message, true);
+    }
 }
 
 // A generation guard, same reasoning as before: if the user opens a
@@ -358,8 +425,9 @@ async function openTag(tag) {
     mergedThisSession = new Set();
     document.getElementById('tag-input').value = tag;
     document.getElementById('doc-tag-label').textContent = '#' + tag;
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('flow-wrap').classList.add('active');
+    document.getElementById('home-view').classList.remove('active');
+    document.getElementById('notebook-view').classList.add('active');
+    document.getElementById('home-btn').style.display = '';
     document.getElementById('doc-status').textContent = 'Loading…';
     document.getElementById('composer-hint').textContent = '';
 

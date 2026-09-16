@@ -283,6 +283,21 @@ func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthCont
 	return Document{Hash: stashed.Hash, Content: content}, nil
 }
 
+// CreatePlainPost stashes content exactly as given, with no forced tag —
+// unlike CreatePost, which always ensures a specific tag's notebook is
+// present. This is for the quick-compose editor: the user can just start
+// typing without opening (or even knowing) any particular tag first. If
+// the content happens to mention a tag inline, it'll naturally show up in
+// that tag's stream later — nothing extra is needed to wire that up, since
+// tag membership is just a property of the content itself.
+func (s *Service) CreatePlainPost(ctx context.Context, auth hatcheckclient.AuthContext, content string) (Post, error) {
+	stashed, err := s.Hatcheck.Stash(ctx, auth, content)
+	if err != nil {
+		return Post{}, fmt.Errorf("stashing post: %w", err)
+	}
+	return Post{Hash: stashed.Hash, Content: content}, nil
+}
+
 // CreatePost stashes content as a new post tagged with tag, ensuring the
 // tag is actually present in the content — Hatcheck only indexes tags it
 // finds inline in the text, so a post created without the tag literally
