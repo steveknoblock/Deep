@@ -172,6 +172,10 @@
             padding: 3px 8px; cursor: pointer; transition: all 0.15s;
         }
         .post-merge:hover { background: var(--accent); color: #fff; }
+        .post-merged-badge {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+            color: var(--accent-dim); cursor: help;
+        }
         .post-body {
             font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap;
         }
@@ -313,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Notebook state ──
 let currentTag = '';
 let streamCache = {}; // hash -> content, for the merge action
+let mergedThisSession = new Set(); // post hashes merged since the last save
 
 async function loadKnownTags() {
     try {
@@ -350,6 +355,7 @@ let loadGeneration = 0;
 async function openTag(tag) {
     const myGeneration = ++loadGeneration;
     currentTag = tag;
+    mergedThisSession = new Set();
     document.getElementById('tag-input').value = tag;
     document.getElementById('doc-tag-label').textContent = '#' + tag;
     document.getElementById('empty-state').style.display = 'none';
@@ -400,6 +406,7 @@ function renderNotebook(view) {
         <div class="post">
             <div class="post-meta">
                 <span class="post-date">${p.created ? escHtml(new Date(p.created).toLocaleString()) : 'unknown date'}</span>
+                ${p.merged ? '<span class="post-merged-badge" title="Merged into a saved version of this document at some point — later edits may have changed or removed that text since.">&check; Merged</span>' : ''}
                 <button class="post-merge" onclick="mergePost('${escAttr(p.hash)}')">Merge &rarr;</button>
             </div>
             <div class="post-body">${escHtml(p.content)}</div>
@@ -413,6 +420,7 @@ function renderNotebook(view) {
 function mergePost(hash) {
     const content = streamCache[hash];
     if (content === undefined) return;
+    mergedThisSession.add(hash);
     const textarea = document.getElementById('doc-textarea');
     const start = textarea.selectionStart;
     const end   = textarea.selectionEnd;
@@ -439,12 +447,18 @@ async function saveDocument() {
     btn.disabled = true;
     btn.textContent = 'Saving…';
     try {
+        const headers = {};
+        if (mergedThisSession.size > 0) {
+            headers['X-Merged-Posts'] = [...mergedThisSession].join(',');
+        }
         const res = await apiFetch(`${API}/notebook/${encodeURIComponent(currentTag)}/document`, {
             method: 'POST',
+            headers,
             body: content,
         });
         if (!res.ok) throw new Error(await res.text());
 
+        mergedThisSession = new Set(); // recorded server-side now — start fresh for the next save
         document.getElementById('doc-status').textContent = 'Saved.';
         showToast('Saved', 'Notebook document for #' + currentTag + ' updated.');
         openTag(currentTag); // reload the full view, including the refreshed stream

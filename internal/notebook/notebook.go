@@ -32,6 +32,11 @@ type Post struct {
 	Content string `json:"content"`
 	Created string `json:"created,omitempty"`
 	Failed  bool   `json:"failed,omitempty"`
+	// Merged is true if this post has been merged into some version of the
+	// document (possibly an earlier one than the current version). It
+	// reflects that a merge happened, not that the post's text is still
+	// present in the document now — later edits could have removed it.
+	Merged bool `json:"merged,omitempty"`
 }
 
 // View is the composed response for a tag: its current document (nil if
@@ -47,13 +52,21 @@ type View struct {
 type Service struct {
 	Hatcheck *hatcheckclient.Client
 
-	// predecessorCache memoizes a hash's supersedes-predecessor. This is an
-	// immutable fact once a supersedes relation is written — it never needs
-	// invalidating — so a single process-wide cache, shared across every
-	// request and every user, is strictly correct, not just an optimization.
-	// (The equivalent cache in notebook.html's earlier, client-side version
-	// was necessarily per-browser-tab; here it's shared for real.)
-	predecessorCache sync.Map // hash (string) -> predecessor hash (string, "" if none)
+	// versionInfoCache memoizes, per hash, its supersedes-predecessor and
+	// the posts merged into it. Both are immutable facts once the relevant
+	// relations are written — they never need invalidating — so a single
+	// process-wide cache, shared across every request and every user, is
+	// strictly correct, not just an optimization. (The equivalent cache in
+	// notebook.html's earlier, client-side version was necessarily
+	// per-browser-tab; here it's shared for real.)
+	versionInfoCache sync.Map // hash (string) -> versionInfo
+}
+
+// versionInfo holds what a single hash's relations say about it: what it
+// superseded (if anything) and what was merged into it (if anything).
+type versionInfo struct {
+	predecessor string   // "" if this is the first version
+	mergedFrom  []string // post hashes merged into this version, if any
 }
 
 // NewService creates a Notebook Service backed by the given Hatcheck client.
@@ -74,53 +87,63 @@ func (s *Service) ListNotebooks(ctx context.Context, auth hatcheckclient.AuthCon
 	return tags, nil
 }
 
-// resolvePredecessor returns hash's supersedes-predecessor, or "" if it has
-// none (either it's the first version, or the relation lookup found
-// nothing). Results are cached forever, per Service's doc comment.
-func (s *Service) resolvePredecessor(ctx context.Context, auth hatcheckclient.AuthContext, hash string) (string, error) {
-	if cached, ok := s.predecessorCache.Load(hash); ok {
-		return cached.(string), nil
+// resolveVersionInfo returns hash's supersedes-predecessor and the posts
+// merged into it, fetching /relations once and caching the result forever
+// per Service's doc comment.
+func (s *Service) resolveVersionInfo(ctx context.Context, auth hatcheckclient.AuthContext, hash string) (versionInfo, error) {
+	if cached, ok := s.versionInfoCache.Load(hash); ok {
+		return cached.(versionInfo), nil
 	}
 
 	outgoing, _, err := s.Hatcheck.Relations(ctx, auth, hash)
 	if err != nil {
 		// Deliberately not cached — a transient error here shouldn't be
-		// remembered as "no predecessor" forever.
-		return "", err
+		// remembered as "nothing found" forever.
+		return versionInfo{}, err
 	}
 
-	pred := ""
+	var info versionInfo
 	for _, r := range outgoing {
-		if r.Rel == "supersedes" {
-			pred = r.To
-			break
+		switch r.Rel {
+		case "supersedes":
+			if info.predecessor == "" {
+				info.predecessor = r.To
+			}
+		case "merged-from":
+			info.mergedFrom = append(info.mergedFrom, r.To)
 		}
 	}
-	s.predecessorCache.Store(hash, pred)
-	return pred, nil
+	s.versionInfoCache.Store(hash, info)
+	return info, nil
 }
 
 // documentVersionChain walks the supersedes chain backward from startHash,
-// returning the set of every hash in it (startHash included). The name
+// returning the set of every hash in it (startHash included) and the set
+// of every post hash merged into any version in that chain. The name
 // index only ever holds the current hash, but nothing in an event-sourced
 // log actually discards history — this just reads back what SaveDocument's
-// relations record, so the stream can exclude every past version, not only
-// the current one.
-func (s *Service) documentVersionChain(ctx context.Context, auth hatcheckclient.AuthContext, startHash string) (map[string]bool, error) {
-	chain := make(map[string]bool)
+// relations record, so the stream can exclude every past version (not only
+// the current one) and flag every post that was ever merged in, even if
+// via an earlier version than the one currently live.
+func (s *Service) documentVersionChain(ctx context.Context, auth hatcheckclient.AuthContext, startHash string) (versions map[string]bool, merged map[string]bool, err error) {
+	versions = make(map[string]bool)
+	merged = make(map[string]bool)
 	current := startHash
-	for current != "" && !chain[current] {
-		chain[current] = true
-		pred, err := s.resolvePredecessor(ctx, auth, current)
+	for current != "" && !versions[current] {
+		versions[current] = true
+		info, err := s.resolveVersionInfo(ctx, auth, current)
 		if err != nil {
 			// Stop walking rather than fail the whole view — a partial
-			// chain still excludes what it found, which is strictly
-			// better than excluding nothing.
+			// chain still excludes/flags what it found, which is strictly
+			// better than finding nothing.
 			break
 		}
-		current = pred
+		for _, m := range info.mergedFrom {
+			merged[m] = true
+		}
+		current = info.predecessor
 	}
-	return chain, nil
+	return versions, merged, nil
 }
 
 // currentDocumentHash resolves notebook/<tag> to its current hash, or ""
@@ -163,8 +186,9 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 	}
 
 	var superseded map[string]bool
+	var merged map[string]bool
 	if docHash != "" {
-		superseded, err = s.documentVersionChain(ctx, auth, docHash)
+		superseded, merged, err = s.documentVersionChain(ctx, auth, docHash)
 		if err != nil {
 			return nil, fmt.Errorf("walking document version chain: %w", err)
 		}
@@ -175,7 +199,9 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 		if superseded[hash] {
 			continue
 		}
-		posts = append(posts, s.fetchPost(ctx, auth, hash))
+		post := s.fetchPost(ctx, auth, hash)
+		post.Merged = merged[hash]
+		posts = append(posts, post)
 	}
 
 	sort.Slice(posts, func(i, j int) bool {
@@ -210,8 +236,12 @@ func (s *Service) fetchPost(ctx context.Context, auth hatcheckclient.AuthContext
 // "previous hash", which removes an entire class of client-side race),
 // stashes the new content, repoints notebook/<tag> at it, and — if a
 // previous version existed — records a supersedes relation from the new
-// version back to it.
-func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthContext, tag, content string) (Document, error) {
+// version back to it. mergedHashes are the post hashes the client actually
+// merged into this save (tracked client-side, since merging itself is a
+// client-side textarea edit Deep has no visibility into) — one merged-from
+// relation is recorded per hash, so the stream can later show which posts
+// have been merged in.
+func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthContext, tag, content string, mergedHashes []string) (Document, error) {
 	previousHash, err := s.currentDocumentHash(ctx, auth, tag)
 	if err != nil {
 		return Document{}, fmt.Errorf("resolving previous document: %w", err)
@@ -238,6 +268,15 @@ func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthCont
 			// error rather than silently swallowed.
 			return Document{Hash: stashed.Hash, Content: content},
 				fmt.Errorf("document saved, but recording its predecessor failed (the old version may reappear in the stream): %w", err)
+		}
+	}
+
+	for _, sourceHash := range mergedHashes {
+		if err := s.Hatcheck.CreateRelation(ctx, auth, stashed.Hash, "merged-from", sourceHash); err != nil {
+			// Same reasoning as above: the document itself saved fine, but
+			// this post won't show as merged until this relation exists.
+			return Document{Hash: stashed.Hash, Content: content},
+				fmt.Errorf("document saved, but recording a merge from %s failed (it may not show as merged): %w", sourceHash, err)
 		}
 	}
 

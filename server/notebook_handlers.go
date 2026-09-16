@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/steveknoblock/Deep/internal/notebook"
 )
@@ -86,7 +87,9 @@ func saveDocumentHandler(svc *notebook.Service) http.HandlerFunc {
 			return
 		}
 
-		doc, err := svc.SaveDocument(req.Context(), auth, tag, string(body))
+		mergedHashes := parseMergedPostsHeader(req.Header.Get("X-Merged-Posts"))
+
+		doc, err := svc.SaveDocument(req.Context(), auth, tag, string(body), mergedHashes)
 		if err != nil {
 			// SaveDocument can return a partial success (the document itself
 			// saved, but the supersedes relation failed) alongside an error —
@@ -97,6 +100,22 @@ func saveDocumentHandler(svc *notebook.Service) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, doc)
 	}
+}
+
+// parseMergedPostsHeader parses a comma-separated list of post hashes,
+// skipping empty entries.
+func parseMergedPostsHeader(header string) []string {
+	if header == "" {
+		return nil
+	}
+	var hashes []string
+	for _, h := range strings.Split(header, ",") {
+		h = strings.TrimSpace(h)
+		if h != "" {
+			hashes = append(hashes, h)
+		}
+	}
+	return hashes
 }
 
 // createPostHandler handles POST /notebook/{tag}/posts — the request body
