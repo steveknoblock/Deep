@@ -55,11 +55,11 @@ Every call needs `Authorization: Bearer <session JWT>`, and may carry `X-Capabil
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET /notebooks` | List the tags that have a notebook document. |
+| `GET /notebooks` | List the tags that have a notebook document. `uncategorized` is always listed first. |
 | `GET /notebook/{tag}` | The notebook: current document (if any) and the post stream. |
 | `POST /notebook/{tag}/document` | Save a new version of the document. The body is the Markdown. An optional `X-Merged-Posts` header lists, comma separated, the post hashes merged in. |
 | `POST /notebook/{tag}/posts` | Create a post in the notebook. The `#tag` is added if the text lacks it. |
-| `POST /posts` | Create a post with no forced tag, for quick notes. |
+| `POST /posts` | Create a quick note. Text that mentions a `#tag` is stored as written; text with no tag gets `#uncategorized` appended. |
 | `/ui/` | The web UI. |
 
 ## Layout

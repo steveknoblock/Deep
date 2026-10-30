@@ -9,6 +9,7 @@ package notebook
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -74,15 +75,21 @@ func NewService(hc *hatcheckclient.Client) *Service {
 	return &Service{Hatcheck: hc}
 }
 
-// ListNotebooks returns every tag that currently has a document.
+// ListNotebooks returns every tag that currently has a document, preceded by
+// the always-present uncategorized tag.
 func (s *Service) ListNotebooks(ctx context.Context, auth hatcheckclient.AuthContext) ([]string, error) {
 	names, err := s.Hatcheck.Names(ctx, auth, Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("listing notebooks: %w", err)
 	}
-	tags := make([]string, 0, len(names))
+	// #uncategorized is always listed first, even before it has a document,
+	// so untagged quick notes always have a visible place to be found.
+	tags := make([]string, 0, len(names)+1)
+	tags = append(tags, UncategorizedTag)
 	for _, n := range names {
-		tags = append(tags, n.Label)
+		if n.Label != UncategorizedTag {
+			tags = append(tags, n.Label)
+		}
 	}
 	return tags, nil
 }
@@ -283,14 +290,30 @@ func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthCont
 	return Document{Hash: stashed.Hash, Content: content}, nil
 }
 
-// CreatePlainPost stashes content exactly as given, with no forced tag —
-// unlike CreatePost, which always ensures a specific tag's notebook is
-// present. This is for the quick-compose editor: the user can just start
-// typing without opening (or even knowing) any particular tag first. If
-// the content happens to mention a tag inline, it'll naturally show up in
-// that tag's stream later — nothing extra is needed to wire that up, since
-// tag membership is just a property of the content itself.
+// UncategorizedTag is the tag given to a quick-compose post that carries no
+// tag of its own, so every post is reachable through some tag's stream.
+const UncategorizedTag = "uncategorized"
+
+// hashtagPattern matches an inline #hashtag: a # at the start of the text or
+// after whitespace, followed by a word character. A Markdown heading such as
+// "# Title" (# then a space) is therefore not a tag.
+var hashtagPattern = regexp.MustCompile(`(^|\s)#[\p{L}\p{N}_-]+`)
+
+// hasHashtag reports whether content mentions at least one inline #hashtag.
+func hasHashtag(content string) bool {
+	return hashtagPattern.MatchString(content)
+}
+
+// CreatePlainPost stashes a post from the quick-compose editor, which the
+// user can use without opening (or even knowing) any particular tag first.
+// Content that already mentions a tag is stashed exactly as given and shows
+// up in that tag's stream, since tag membership is just a property of the
+// content. Content with no tag at all gets #uncategorized appended, so it
+// can still be found in that tag's stream instead of being unreachable.
 func (s *Service) CreatePlainPost(ctx context.Context, auth hatcheckclient.AuthContext, content string) (Post, error) {
+	if !hasHashtag(content) {
+		content = strings.TrimRight(content, "\n") + "\n\n#" + UncategorizedTag
+	}
 	stashed, err := s.Hatcheck.Stash(ctx, auth, content)
 	if err != nil {
 		return Post{}, fmt.Errorf("stashing post: %w", err)
