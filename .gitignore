@@ -8,3 +8,8 @@
 .env
 .env.*
 !.env.example
+
+# Binary files
+deep
+deep-server
+
