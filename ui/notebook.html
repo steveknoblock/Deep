@@ -99,6 +99,11 @@
         }
         .flow-wrap.active { display: grid; }
 
+        /* Home view: narrow tag list on the left, wide quick-compose editor on
+           the right. The divider can still be dragged to resize. */
+        #home-view { grid-template-columns: 240px 4px 1fr; }
+        #home-tags-panel { min-width: 160px; }
+
         .flow-sticky {
             display: flex; flex-direction: column;
             min-width: 280px;
@@ -578,7 +583,7 @@ document.querySelectorAll('.flow-wrap').forEach(wrap => {
     document.addEventListener('mousemove', e => {
         if (!dragging) return;
         const rect = wrap.getBoundingClientRect();
-        const min  = 240;
+        const min  = wrap.id === 'home-view' ? 160 : 240;
         const max  = wrap.offsetWidth - 244;
         const w    = Math.max(min, Math.min(max, e.clientX - rect.left));
         wrap.style.gridTemplateColumns = `${w}px 4px 1fr`;
