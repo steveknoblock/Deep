@@ -99,6 +99,19 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body []byte
 	return c.HTTP.Do(req)
 }
 
+// StatusError is returned when Hatcheck answers with a non-2xx status. It
+// keeps the status code so callers can tell "Hatcheck rejected this session"
+// (401/403) from "Hatcheck couldn't be reached or failed" — wrapping the
+// error with %w preserves it for errors.As.
+type StatusError struct {
+	Code int
+	Body string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("hatcheck returned %d: %s", e.Code, e.Body)
+}
+
 // readAndCheck reads the full response body and returns an error if the
 // status code isn't 2xx, including the body text (Hatcheck's handlers
 // return plain-text error messages) for context.
@@ -109,7 +122,7 @@ func readAndCheck(res *http.Response) ([]byte, error) {
 		return nil, err
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("hatcheck returned %d: %s", res.StatusCode, string(body))
+		return nil, &StatusError{Code: res.StatusCode, Body: string(body)}
 	}
 	return body, nil
 }

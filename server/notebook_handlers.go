@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/steveknoblock/Deep/internal/hatcheckclient"
 	"github.com/steveknoblock/Deep/internal/notebook"
 )
 
@@ -22,6 +24,20 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	http.Error(w, message, status)
 }
 
+// writeUpstreamError reports a failed Hatcheck call. If Hatcheck rejected the
+// caller's session or capability (401/403), that status is passed through so
+// the browser can react — a 401 signs the user out and asks them to sign in
+// again. Everything else (Hatcheck unreachable, a server error, a malformed
+// response) is a 502, since the problem is upstream rather than the caller's.
+func writeUpstreamError(w http.ResponseWriter, err error) {
+	var se *hatcheckclient.StatusError
+	if errors.As(err, &se) && (se.Code == http.StatusUnauthorized || se.Code == http.StatusForbidden) {
+		writeError(w, se.Code, err.Error())
+		return
+	}
+	writeError(w, http.StatusBadGateway, err.Error())
+}
+
 // listNotebooksHandler handles GET /notebooks — every tag with a document.
 func listNotebooksHandler(svc *notebook.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -33,7 +49,7 @@ func listNotebooksHandler(svc *notebook.Service) http.HandlerFunc {
 
 		tags, err := svc.ListNotebooks(req.Context(), auth)
 		if err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeUpstreamError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, tags)
@@ -58,7 +74,7 @@ func getNotebookHandler(svc *notebook.Service) http.HandlerFunc {
 
 		view, err := svc.GetNotebook(req.Context(), auth, tag)
 		if err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeUpstreamError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, view)
@@ -95,7 +111,7 @@ func saveDocumentHandler(svc *notebook.Service) http.HandlerFunc {
 			// saved, but the supersedes relation failed) alongside an error —
 			// still report 502, since the caller needs to know something
 			// went wrong, but the document write itself may have landed.
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeUpstreamError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, doc)
@@ -140,7 +156,7 @@ func createPlainPostHandler(svc *notebook.Service) http.HandlerFunc {
 
 		post, err := svc.CreatePlainPost(req.Context(), auth, string(body))
 		if err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeUpstreamError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, post)
@@ -175,7 +191,7 @@ func createPostHandler(svc *notebook.Service) http.HandlerFunc {
 
 		post, err := svc.CreatePost(req.Context(), auth, tag, string(body))
 		if err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
+			writeUpstreamError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, post)

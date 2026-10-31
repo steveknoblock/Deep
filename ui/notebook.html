@@ -75,6 +75,7 @@
 
         .home-tags-list { flex: 1; overflow-y: auto; margin-top: 6px; }
         .home-tags-empty { color: var(--text-muted); font-size: 12px; padding: 10px 0; }
+        .home-tags-error { color: var(--danger); }
         .home-tag-item {
             display: block; width: 100%; text-align: left;
             font-size: 13px; font-family: var(--mono); color: var(--text);
@@ -353,10 +354,24 @@ let currentTag = '';
 let streamCache = {}; // hash -> content, for the merge action
 let mergedThisSession = new Set(); // post hashes merged since the last save
 
+// Shows a message in the tag list panel instead of leaving it blank.
+function showTagsError(message) {
+    const container = document.getElementById('home-tags');
+    container.innerHTML = '';
+    const note = document.createElement('div');
+    note.className = 'home-tags-empty home-tags-error';
+    note.textContent = message;
+    container.appendChild(note);
+}
+
 async function loadKnownTags() {
     try {
         const res = await apiFetch(`${API}/notebooks`);
-        if (!res.ok) return;
+        if (!res.ok) {
+            const detail = (await res.text()).trim();
+            showTagsError(`Couldn't load notebooks (${res.status}). ${detail}`);
+            return;
+        }
         const tags = await res.json();
         const container = document.getElementById('home-tags');
         if (!tags || tags.length === 0) {
@@ -372,7 +387,9 @@ async function loadKnownTags() {
             container.appendChild(item);
         });
     } catch (err) {
-        // Ambient listing failure isn't fatal — the tag input still works.
+        // A 401 already signed the user out and showed its own message; any
+        // other failure (e.g. Deep unreachable) should still be visible here.
+        if (sessionJWT) showTagsError(`Couldn't load notebooks: ${err.message}`);
     }
 }
 
