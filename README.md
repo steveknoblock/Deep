@@ -31,6 +31,19 @@ set -a && source .env && set +a
 go run ./server
 ```
 
+`deep.sh` runs Deep in the background as a process named `deep-server`, so it is easy to find in `ps` or `top`:
+
+```sh
+./deep.sh start      # rebuilds first if the Go code changed
+./deep.sh start -f   # also stops whatever is holding Deep's port
+./deep.sh stop
+./deep.sh restart
+./deep.sh status
+./deep.sh logs
+```
+
+It reads `.env` for the same settings and writes its log to `deep.log`.
+
 `start.sh` does the same after pulling the latest code and building. It expects the project at `~/projects/Deep`, so adjust the `cd` line if yours is elsewhere.
 
 Deep listens on port 8091 by default and serves its own UI at `http://localhost:8091/ui/notebook.html`.

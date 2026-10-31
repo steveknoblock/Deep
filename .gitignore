@@ -13,3 +13,6 @@
 deep
 deep-server
 
+# Runtime files from deep.sh
+deep.log
+.deep.pid
