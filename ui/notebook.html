@@ -118,6 +118,13 @@
             padding: 20px 24px;
             overflow: hidden;
         }
+        /* Collapsed: the rail and its divider are hidden, so .main is the only
+           grid item and gets one full-width column. !important beats the
+           inline width set by dragging. */
+        .app.rail-collapsed { grid-template-columns: 1fr !important; }
+        .app.rail-collapsed > .rail,
+        .app.rail-collapsed > .divider { display: none; }
+        .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
         .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
         .main > .flow-wrap { min-width: 0; }
         .home-editor {
@@ -234,6 +241,7 @@
 </header>
 
 <div class="tag-bar" id="tag-bar" style="display:none;">
+    <button class="btn" id="rail-toggle" onclick="toggleRail()" aria-controls="home-tags-panel" aria-pressed="true" title="Show or hide the notebook list">&#9776; Notebooks</button>
     <button class="btn" id="home-btn" onclick="showHome()" title="Back to all notebooks" style="display:none;">&#8962; All notebooks</button>
     <div class="tag-input-wrap">
         <input class="tag-input" id="tag-input" type="text" placeholder="tag"
@@ -370,6 +378,7 @@ async function apiFetch(url, options = {}) {
 
 document.addEventListener('DOMContentLoaded', () => {
     captureHandoff();
+    restoreRailState();
     updateAuthUI();
     if (sessionJWT) loadKnownTags();
 });
@@ -420,6 +429,27 @@ async function loadKnownTags() {
         // other failure (e.g. Deep unreachable) should still be visible here.
         if (sessionJWT) showTagsError(`Couldn't load notebooks: ${err.message}`);
     }
+}
+
+// ── Notebook list panel: open / close ──
+// The choice is remembered across visits. Storage can be unavailable (private
+// windows, blocked site data), so every access is guarded.
+const RAIL_KEY = 'deep_rail_collapsed';
+
+function setRailCollapsed(collapsed) {
+    document.getElementById('app').classList.toggle('rail-collapsed', collapsed);
+    document.getElementById('rail-toggle').setAttribute('aria-pressed', String(!collapsed));
+    try { localStorage.setItem(RAIL_KEY, collapsed ? '1' : '0'); } catch (e) {}
+}
+
+function toggleRail() {
+    setRailCollapsed(!document.getElementById('app').classList.contains('rail-collapsed'));
+}
+
+function restoreRailState() {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(RAIL_KEY) === '1'; } catch (e) {}
+    setRailCollapsed(collapsed);
 }
 
 // Highlights the open notebook in the rail right away, without waiting for
