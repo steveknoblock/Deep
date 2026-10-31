@@ -83,6 +83,7 @@
             padding: 10px 4px; cursor: pointer; transition: all 0.15s;
         }
         .home-tag-item:hover { color: var(--accent); background: var(--surface2); }
+        .home-tag-item.active { color: var(--accent); background: var(--surface2); font-weight: 700; }
 
         /* ── Empty / signed-out states ── */
         .empty-state {
@@ -100,10 +101,30 @@
         }
         .flow-wrap.active { display: grid; }
 
-        /* Home view: narrow tag list on the left, wide quick-compose editor on
-           the right. The divider can still be dragged to resize. */
-        #home-view { grid-template-columns: 240px 4px 1fr; }
-        #home-tags-panel { min-width: 160px; }
+        /* ── App layout ──
+           The tag list is a permanent rail on the left. Only the right side
+           changes: the quick-compose editor (home) or the notebook (document
+           plus post stream). Dragging the first divider resizes the rail. */
+        .app {
+            display: none;
+            flex: 1;
+            min-height: 0;
+            grid-template-columns: 240px 4px 1fr;
+        }
+        .app.active { display: grid; }
+        .rail {
+            display: flex; flex-direction: column;
+            min-width: 160px;
+            padding: 20px 24px;
+            overflow: hidden;
+        }
+        .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+        .main > .flow-wrap { min-width: 0; }
+        .home-editor {
+            display: none; flex: 1; min-height: 0; flex-direction: column;
+            padding: 20px 24px;
+        }
+        .home-editor.active { display: flex; }
 
         .flow-sticky {
             display: flex; flex-direction: column;
@@ -193,6 +214,8 @@
 
         /* ── Responsive ── */
         @media (max-width: 750px) {
+            .app.active { display: flex; flex-direction: column; }
+            .rail { min-width: 0; max-height: 30vh; }
             .flow-wrap.active { display: flex; flex-direction: column; }
             .divider { display: none; }
             .flow-sticky { max-height: 40vh; }
@@ -221,51 +244,52 @@
 
 <div class="empty-state" id="signed-out-state" style="display:none;"></div>
 
-<!-- Shown when no notebook is open: a scrollable list of known tags on the
-     left, and a quick-compose editor on the right so the user can just
-     start typing without opening any particular notebook first. Shares
-     the .flow-wrap layout (grid + draggable divider) with the notebook
-     view below purely for visual and structural consistency. -->
-<section class="flow-wrap active" id="home-view">
-    <section class="flow-sticky" id="home-tags-panel">
+<!-- The tag list is a permanent rail on the left, so it stays put when a
+     notebook opens. The right side swaps between the quick-compose editor
+     (no notebook open, so the user can just start typing) and the notebook
+     view (document on the left, post stream on the right). -->
+<div class="app" id="app">
+    <section class="rail" id="home-tags-panel">
         <span class="flow-tag">Notebooks</span>
         <div class="home-tags-list" id="home-tags"></div>
     </section>
 
-    <div class="divider"></div>
+    <div class="divider" id="rail-divider"></div>
 
-    <section class="flow-scroll" id="home-editor-panel">
-        <textarea class="doc-textarea" id="quick-editor" placeholder="Just start typing… use #hashtags to tag it. Untagged notes go to #uncategorized."></textarea>
-        <div class="doc-footer">
-            <span class="doc-status" id="quick-status"></span>
-            <button class="btn btn-primary" onclick="postQuickNote()">Post</button>
-        </div>
-    </section>
-</section>
-
-<section class="flow-wrap" id="notebook-view">
-    <section class="flow-sticky" id="flow-left">
-        <span class="flow-tag" id="doc-tag-label"></span>
-        <textarea class="doc-textarea" id="doc-textarea" placeholder="Notebook document — Markdown source."></textarea>
-        <div class="doc-footer">
-            <span class="doc-status" id="doc-status"></span>
-            <button class="btn btn-primary" id="save-btn" onclick="saveDocument()">Save</button>
-        </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <section class="flow-scroll" id="flow-right">
-        <div class="composer">
-            <textarea class="composer-textarea" id="composer-textarea" placeholder="New post…"></textarea>
-            <div class="composer-footer">
-                <span class="composer-hint" id="composer-hint"></span>
-                <button class="btn btn-primary" onclick="postToStream()">Post</button>
+    <div class="main">
+        <section class="home-editor active" id="home-view">
+            <textarea class="doc-textarea" id="quick-editor" placeholder="Just start typing… use #hashtags to tag it. Untagged notes go to #uncategorized."></textarea>
+            <div class="doc-footer">
+                <span class="doc-status" id="quick-status"></span>
+                <button class="btn btn-primary" onclick="postQuickNote()">Post</button>
             </div>
-        </div>
-        <div id="stream-list"></div>
-    </section>
-</section>
+        </section>
+
+        <section class="flow-wrap" id="notebook-view">
+            <section class="flow-sticky" id="flow-left">
+                <span class="flow-tag" id="doc-tag-label"></span>
+                <textarea class="doc-textarea" id="doc-textarea" placeholder="Notebook document — Markdown source."></textarea>
+                <div class="doc-footer">
+                    <span class="doc-status" id="doc-status"></span>
+                    <button class="btn btn-primary" id="save-btn" onclick="saveDocument()">Save</button>
+                </div>
+            </section>
+
+            <div class="divider"></div>
+
+            <section class="flow-scroll" id="flow-right">
+                <div class="composer">
+                    <textarea class="composer-textarea" id="composer-textarea" placeholder="New post…"></textarea>
+                    <div class="composer-footer">
+                        <span class="composer-hint" id="composer-hint"></span>
+                        <button class="btn btn-primary" onclick="postToStream()">Post</button>
+                    </div>
+                </div>
+                <div id="stream-list"></div>
+            </section>
+        </section>
+    </div>
+</div>
 
 <div class="toast" id="toast">
     <div class="toast-label" id="toast-label">Info</div>
@@ -307,6 +331,7 @@ function updateAuthUI() {
     const loggedIn = !!sessionJWT;
     document.getElementById('tag-bar').style.display = loggedIn ? '' : 'none';
     document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
+    document.getElementById('app').classList.toggle('active', loggedIn);
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-btn').style.display = 'none';
 
@@ -372,9 +397,12 @@ async function loadKnownTags() {
             showTagsError(`Couldn't load notebooks (${res.status}). ${detail}`);
             return;
         }
-        const tags = await res.json();
+        const tags = (await res.json()) || [];
+        // Keep the open notebook visible in the rail even if it has no
+        // document yet, so the rail always shows where you are.
+        if (currentTag && !tags.includes(currentTag)) tags.push(currentTag);
         const container = document.getElementById('home-tags');
-        if (!tags || tags.length === 0) {
+        if (tags.length === 0) {
             container.innerHTML = '<div class="home-tags-empty">No notebooks yet — post something with a #tag to start one.</div>';
             return;
         }
@@ -383,6 +411,7 @@ async function loadKnownTags() {
             const item = document.createElement('button');
             item.className = 'home-tag-item';
             item.textContent = '#' + tag;
+            if (tag === currentTag) item.classList.add('active');
             item.onclick = () => openTag(tag);
             container.appendChild(item);
         });
@@ -391,6 +420,14 @@ async function loadKnownTags() {
         // other failure (e.g. Deep unreachable) should still be visible here.
         if (sessionJWT) showTagsError(`Couldn't load notebooks: ${err.message}`);
     }
+}
+
+// Highlights the open notebook in the rail right away, without waiting for
+// the list to reload.
+function markActiveTag() {
+    document.querySelectorAll('#home-tags .home-tag-item').forEach(el => {
+        el.classList.toggle('active', currentTag !== '' && el.textContent === '#' + currentTag);
+    });
 }
 
 function openTagFromInput() {
@@ -407,6 +444,7 @@ function showHome() {
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-view').classList.add('active');
     document.getElementById('home-btn').style.display = 'none';
+    markActiveTag();
     loadKnownTags();
 }
 
@@ -450,6 +488,7 @@ async function openTag(tag) {
     document.getElementById('home-view').classList.remove('active');
     document.getElementById('notebook-view').classList.add('active');
     document.getElementById('home-btn').style.display = '';
+    markActiveTag();
     document.getElementById('doc-status').textContent = 'Loading…';
     document.getElementById('composer-hint').textContent = '';
 
@@ -582,12 +621,12 @@ async function postToStream() {
     }
 }
 
-// ── Draggable divider ──
-document.querySelectorAll('.flow-wrap').forEach(wrap => {
-    const divider = wrap.querySelector('.divider');
-    const left    = wrap.querySelector('.flow-sticky');
-    if (!divider || !left) return;
-
+// ── Draggable dividers ──
+// Dragging a divider resizes the column to its left. min is that column's
+// smallest width, and rightMin the smallest width left for the column on
+// its right.
+function makeResizable(wrap, divider, min, rightMin) {
+    if (!wrap || !divider) return;
     let dragging = false;
 
     divider.addEventListener('mousedown', () => {
@@ -600,8 +639,7 @@ document.querySelectorAll('.flow-wrap').forEach(wrap => {
     document.addEventListener('mousemove', e => {
         if (!dragging) return;
         const rect = wrap.getBoundingClientRect();
-        const min  = wrap.id === 'home-view' ? 160 : 240;
-        const max  = wrap.offsetWidth - 244;
+        const max  = wrap.offsetWidth - rightMin;
         const w    = Math.max(min, Math.min(max, e.clientX - rect.left));
         wrap.style.gridTemplateColumns = `${w}px 4px 1fr`;
     });
@@ -613,7 +651,10 @@ document.querySelectorAll('.flow-wrap').forEach(wrap => {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
     });
-});
+}
+
+makeResizable(document.getElementById('app'), document.getElementById('rail-divider'), 160, 480);
+makeResizable(document.getElementById('notebook-view'), document.querySelector('#notebook-view .divider'), 240, 244);
 
 // ── Helpers ──
 function escHtml(str) {
