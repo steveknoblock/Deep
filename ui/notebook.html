@@ -22,7 +22,8 @@
             --danger:      #cc3333;
             --danger-soft: #ff8888;
             --on-accent:   #ffffff;
-            --mono:        'Inconsolata', monospace;
+            --radius:      6px;
+            --mono:       'Inconsolata', monospace;
             --sans:        'Lato', sans-serif;
             --serif:       'Lora', serif;
         }
@@ -63,6 +64,7 @@
             background: var(--bg); border: 1px solid var(--border); color: var(--text);
             font-family: var(--mono); font-size: 13px; padding: 6px 10px; outline: none;
             width: 200px; transition: border-color 0.15s;
+            border-radius: var(--radius);
         }
         .tag-input:focus { border-color: var(--accent); }
         .btn {
@@ -150,6 +152,7 @@
             background: var(--surface); border: 1px solid var(--border); color: var(--text);
             font-family: var(--serif); font-size: 15px; line-height: 1.7;
             padding: 16px; outline: none; transition: border-color 0.15s;
+            border-radius: var(--radius);
         }
         .doc-textarea:focus { border-color: var(--accent); }
         .doc-footer {
@@ -189,6 +192,7 @@
             background: var(--surface); border: 1px solid var(--border); color: var(--text);
             font-family: var(--sans); font-size: 13px; line-height: 1.6;
             padding: 10px 12px; outline: none; transition: border-color 0.15s;
+            border-radius: var(--radius);
         }
         .composer-textarea:focus { border-color: var(--accent); }
         .composer-footer { display: flex; align-items: center; gap: 10px; }
@@ -199,6 +203,7 @@
         .post {
             background: var(--surface); border: 1px solid var(--border);
             padding: 12px 14px; margin-bottom: 12px;
+            border-radius: var(--radius);
         }
         .post-meta {
             display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
