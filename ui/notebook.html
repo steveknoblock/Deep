@@ -182,22 +182,6 @@
             padding: 20px 24px;
             overflow-y: auto;
         }
-        .composer {
-            display: flex; flex-direction: column; gap: 8px;
-            margin-bottom: 20px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-        .composer-textarea {
-            width: 100%; resize: vertical; min-height: 60px;
-            background: var(--surface); border: 1px solid var(--border); color: var(--text);
-            font-family: var(--sans); font-size: 13px; line-height: 1.6;
-            padding: 10px 12px; outline: none; transition: border-color 0.15s;
-            border-radius: var(--radius);
-        }
-        .composer-textarea:focus { border-color: var(--accent); }
-        .composer-footer { display: flex; align-items: center; gap: 10px; }
-        .composer-hint { font-size: 11px; color: var(--text-muted); flex: 1; }
-
         .stream-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 30px 0; }
 
         .post {
@@ -293,13 +277,6 @@
             <div class="divider"></div>
 
             <section class="flow-scroll" id="flow-right">
-                <div class="composer">
-                    <textarea class="composer-textarea" id="composer-textarea" placeholder="New post…"></textarea>
-                    <div class="composer-footer">
-                        <span class="composer-hint" id="composer-hint"></span>
-                        <button class="btn btn-primary" onclick="postToStream()">Post</button>
-                    </div>
-                </div>
                 <div id="stream-list"></div>
             </section>
         </section>
@@ -527,7 +504,6 @@ async function openTag(tag) {
     document.getElementById('home-btn').style.display = '';
     markActiveTag();
     document.getElementById('doc-status').textContent = 'Loading…';
-    document.getElementById('composer-hint').textContent = '';
 
     try {
         const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}`);
@@ -634,27 +610,6 @@ async function saveDocument() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Save';
-    }
-}
-
-// Posts new content. Deep ensures the tag is present in the content —
-// the client just sends what the user typed.
-async function postToStream() {
-    const textarea = document.getElementById('composer-textarea');
-    const content = textarea.value.trim();
-    if (!content || !currentTag) return;
-
-    try {
-        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(currentTag)}/posts`, {
-            method: 'POST',
-            body: content,
-        });
-        if (!res.ok) throw new Error(await res.text());
-        textarea.value = '';
-        document.getElementById('composer-hint').textContent = '';
-        openTag(currentTag);
-    } catch (err) {
-        showToast('Post failed', err.message, true);
     }
 }
 

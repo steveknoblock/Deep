@@ -15,7 +15,7 @@ Deep's UI is one page (`ui/notebook.html`, `develop` branch) with two views that
 Shown when a topic (`#tag`) is open: the left panel holds the document, and the right panel holds the posts that feed it.
 
 - **Left panel (sticky):** the notebook's Markdown document in a plain textarea, with the `#tag` label above it and a status line and Save button below. The document is edited as Markdown source rather than in a rich text editor.
-- **Right panel (scrolling):** a composer for new posts at the top, then the stream of every post carrying that tag, newest first. Each post shows its date, a "Merged" badge if it has been merged before, and a **Merge →** button.
+- **Right panel (scrolling):** the stream of every post carrying that tag, newest first. Each post shows its date, a "Merged" badge if it has been merged before, and a **Merge →** button.
 - **Merge:** inserts the post's text into the document at the cursor, or over the current selection, adding paragraph breaks as needed. The status then reads "Merged — not yet saved."
 - **Save:** creates a new immutable document version that supersedes the previous one and records which posts were merged in. The view then reloads, so the stream and badges refresh.
 
