@@ -4,11 +4,14 @@ Oct 30, 2026 · @Steve
 
 ## Overview
 
-Deep's UI is one page (`ui/notebook.html`, `develop` branch) with two views that share the same two-panel layout: a left panel, a 4px draggable divider, and a right panel.
+Deep's UI is one page (`ui/notebook.html`, `develop` branch). From left to right it has a narrow menu bar, a sidebar, an editor panel and a stream of posts, with draggable dividers between the panels.
 
-- **Layout:** a CSS grid (`1fr 4px 1fr` for notebooks, `240px 4px 1fr` on the home view).
-- **Resizing:** dragging the divider resizes the panels. Minimum widths keep either panel from collapsing (160px on home, 240px in a notebook).
-- **Small screens:** below 750px the panels stack vertically, the divider is hidden, and the left panel is capped at 40% of viewport height.
+- **Menu bar:** a 48px vertical strip down the left edge, always visible. Its notebooks icon opens and closes the sidebar. When more menus exist, this is where the user picks which one the sidebar shows.
+- **Sidebar:** the notebook list. It starts closed, opens from the menu bar icon, and closes with the close icon in its header. When closed it takes up no space. The open or closed choice is remembered across visits.
+- **Main area:** the quick-compose editor (home) or the notebook (document plus post stream).
+- **Layout:** a CSS grid (`240px 4px 1fr` with the sidebar open, `1fr` when closed), and `1fr 4px 1fr` inside a notebook.
+- **Resizing:** dragging a divider resizes the panel to its left. Minimum widths keep a panel from collapsing (160px for the sidebar, 240px for the document).
+- **Small screens:** below 750px the menu bar becomes a horizontal strip, the panels stack vertically, the dividers are hidden, and the left panel is capped at 40% of viewport height.
 
 ## Notebook view
 
@@ -23,8 +26,8 @@ Shown when a topic (`#tag`) is open: the left panel holds the document, and the 
 
 This is the first screen whenever no notebook is open, so you can start writing without choosing a notebook first.
 
-- **Left panel (narrow, 240px):** a scrollable list of known notebooks (tags), with `uncategorized` listed first.
-- **Right panel (wide):** a quick-compose editor. Text with a `#tag` is stored as written, and untagged text gets `#uncategorized` appended.
+- **Sidebar (240px when open):** a scrollable list of known notebooks (tags), with `uncategorized` listed first.
+- **Main area:** a quick-compose editor. Text with a `#tag` is stored as written, and untagged text gets `#uncategorized` appended.
 - **Navigation:** the **All notebooks** button returns here from any open notebook.
 
 ## Design intent

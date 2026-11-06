@@ -105,30 +105,65 @@
         }
         .flow-wrap.active { display: grid; }
 
-        /* ── App layout ──
-           The tag list is a permanent rail on the left. Only the right side
-           changes: the quick-compose editor (home) or the notebook (document
-           plus post stream). Dragging the first divider resizes the rail. */
-        .app {
+        /* ── Shell: menu bar + app ──
+           A narrow menu bar runs down the left edge and is always visible.
+           Next to it is the app grid: the sidebar (notebook list), then the
+           main area (quick-compose editor, or the notebook's document plus
+           post stream). */
+        .shell {
             display: none;
             flex: 1;
             min-height: 0;
+        }
+        .shell.active { display: flex; }
+
+        .menubar {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            flex-shrink: 0; width: 48px;
+            padding: 10px 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+        }
+        .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; padding: 0;
+            background: transparent; border: 1px solid transparent; color: var(--text-dim);
+            border-radius: var(--radius); cursor: pointer; transition: all 0.15s;
+        }
+        .icon-btn:hover { color: var(--accent); background: var(--surface2); }
+        .icon-btn[aria-pressed="true"] { color: var(--accent); background: var(--surface2); border-color: var(--border); }
+        .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .icon-btn svg { display: block; }
+
+        /* ── App layout ──
+           The sidebar sits on the left of the app grid. Only the right side
+           changes: the quick-compose editor (home) or the notebook (document
+           plus post stream). Dragging the first divider resizes the sidebar. */
+        .app {
+            display: grid;
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
             grid-template-columns: 240px 4px 1fr;
         }
-        .app.active { display: grid; }
         .rail {
             display: flex; flex-direction: column;
             min-width: 160px;
             padding: 20px 24px;
             overflow: hidden;
         }
-        /* Collapsed: the rail and its divider are hidden, so .main is the only
-           grid item and gets one full-width column. !important beats the
-           inline width set by dragging. */
+        .rail-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .rail-head .flow-tag { margin-bottom: 0; }
+        .rail-head .icon-btn { width: 28px; height: 28px; margin-right: -6px; }
+        /* Closed: the sidebar and its divider are hidden, so .main is the only
+           grid item and gets one full-width column — the closed sidebar takes
+           up no space. !important beats the inline width set by dragging. */
         .app.rail-collapsed { grid-template-columns: 1fr !important; }
         .app.rail-collapsed > .rail,
         .app.rail-collapsed > .divider { display: none; }
-        .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
         .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
         .main > .flow-wrap { min-width: 0; }
         .home-editor {
@@ -212,7 +247,12 @@
 
         /* ── Responsive ── */
         @media (max-width: 750px) {
-            .app.active { display: flex; flex-direction: column; }
+            .shell.active { flex-direction: column; }
+            .menubar {
+                flex-direction: row; width: auto; padding: 6px 10px;
+                border-right: none; border-bottom: 1px solid var(--border);
+            }
+            .app { display: flex; flex-direction: column; }
             .rail { min-width: 0; max-height: 30vh; }
             .flow-wrap.active { display: flex; flex-direction: column; }
             .divider { display: none; }
@@ -232,7 +272,6 @@
 </header>
 
 <div class="tag-bar" id="tag-bar" style="display:none;">
-    <button class="btn" id="rail-toggle" onclick="toggleRail()" aria-controls="home-tags-panel" aria-pressed="true" title="Show or hide the notebook list">&#9776; Notebooks</button>
     <button class="btn" id="home-btn" onclick="showHome()" title="Back to all notebooks" style="display:none;">&#8962; All notebooks</button>
     <div class="tag-input-wrap">
         <input class="tag-input" id="tag-input" type="text" placeholder="tag"
@@ -243,13 +282,28 @@
 
 <div class="empty-state" id="signed-out-state" style="display:none;"></div>
 
-<!-- The tag list is a permanent rail on the left, so it stays put when a
-     notebook opens. The right side swaps between the quick-compose editor
+<!-- Left to right: a narrow menu bar (always visible), the sidebar with the
+     notebook list (opened from the menu bar, closed with its own close icon),
+     then the main area. The main area swaps between the quick-compose editor
      (no notebook open, so the user can just start typing) and the notebook
      view (document on the left, post stream on the right). -->
+<div class="shell" id="shell">
+<nav class="menubar" aria-label="Main menu">
+    <button class="icon-btn" id="menu-notebooks" onclick="toggleRail()"
+            aria-controls="home-tags-panel" aria-pressed="false"
+            title="Notebooks" aria-label="Notebooks">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>
+    </button>
+</nav>
+
 <div class="app" id="app">
     <section class="rail" id="home-tags-panel">
-        <span class="flow-tag">Notebooks</span>
+        <div class="rail-head">
+            <span class="flow-tag">Notebooks</span>
+            <button class="icon-btn" onclick="setRailCollapsed(true)" title="Close" aria-label="Close notebook list">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
         <div class="home-tags-list" id="home-tags"></div>
     </section>
 
@@ -281,6 +335,7 @@
             </section>
         </section>
     </div>
+</div>
 </div>
 
 <div class="toast" id="toast">
@@ -323,7 +378,7 @@ function updateAuthUI() {
     const loggedIn = !!sessionJWT;
     document.getElementById('tag-bar').style.display = loggedIn ? '' : 'none';
     document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
-    document.getElementById('app').classList.toggle('active', loggedIn);
+    document.getElementById('shell').classList.toggle('active', loggedIn);
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-btn').style.display = 'none';
 
@@ -415,15 +470,16 @@ async function loadKnownTags() {
     }
 }
 
-// ── Notebook list panel: open / close ──
-// The choice is remembered across visits. Storage can be unavailable (private
-// windows, blocked site data), so every access is guarded.
-const RAIL_KEY = 'deep_rail_collapsed';
+// ── Sidebar (notebook list): open / close ──
+// The sidebar starts closed; the menu bar icon opens it and its close icon
+// closes it. The choice is remembered across visits. Storage can be
+// unavailable (private windows, blocked site data), so every access is guarded.
+const SIDEBAR_KEY = 'deep_sidebar_open';
 
 function setRailCollapsed(collapsed) {
     document.getElementById('app').classList.toggle('rail-collapsed', collapsed);
-    document.getElementById('rail-toggle').setAttribute('aria-pressed', String(!collapsed));
-    try { localStorage.setItem(RAIL_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    document.getElementById('menu-notebooks').setAttribute('aria-pressed', String(!collapsed));
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? '0' : '1'); } catch (e) {}
 }
 
 function toggleRail() {
@@ -431,9 +487,9 @@ function toggleRail() {
 }
 
 function restoreRailState() {
-    let collapsed = false;
-    try { collapsed = localStorage.getItem(RAIL_KEY) === '1'; } catch (e) {}
-    setRailCollapsed(collapsed);
+    let open = false;
+    try { open = localStorage.getItem(SIDEBAR_KEY) === '1'; } catch (e) {}
+    setRailCollapsed(!open);
 }
 
 // Highlights the open notebook in the rail right away, without waiting for
