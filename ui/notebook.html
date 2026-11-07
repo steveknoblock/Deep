@@ -270,6 +270,10 @@
             title="Notebooks" aria-label="Notebooks">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>
     </button>
+    <button class="icon-btn" id="menu-quick-note" onclick="showHome()"
+            aria-pressed="false" title="Quick note" aria-label="Quick note">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+    </button>
 </nav>
 
 <div class="app" id="app">
@@ -480,6 +484,7 @@ function showHome() {
     currentTag = '';
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-view').classList.add('active');
+    document.getElementById('menu-quick-note').setAttribute('aria-pressed', 'true');
     markActiveTag();
     loadKnownTags();
 }
@@ -522,6 +527,7 @@ async function openTag(tag) {
     document.getElementById('doc-tag-label').textContent = '#' + tag;
     document.getElementById('home-view').classList.remove('active');
     document.getElementById('notebook-view').classList.add('active');
+    document.getElementById('menu-quick-note').setAttribute('aria-pressed', 'false');
     markActiveTag();
     document.getElementById('doc-status').textContent = 'Loading…';
 
