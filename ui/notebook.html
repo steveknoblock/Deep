@@ -52,13 +52,6 @@
         }
         .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
 
-        /* ── Tag bar ── */
-        .tag-bar {
-            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-            padding: 10px 20px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-        }
         .btn {
             font-family: var(--sans); font-size: 12px; font-weight: 700; padding: 6px 14px;
             border: 1px solid var(--border); background: var(--surface2); color: var(--text);
@@ -263,10 +256,6 @@
     <button class="btn-logout" id="logout-btn" onclick="logout()" style="display:none;">Sign out</button>
 </header>
 
-<div class="tag-bar" id="tag-bar" style="display:none;">
-    <button class="btn" id="home-btn" onclick="showHome()" title="Back to all notebooks" style="display:none;">&#8962; All notebooks</button>
-</div>
-
 <div class="empty-state" id="signed-out-state" style="display:none;"></div>
 
 <!-- Left to right: a narrow menu bar (always visible), the sidebar with the
@@ -363,11 +352,9 @@ function captureHandoff() {
 
 function updateAuthUI() {
     const loggedIn = !!sessionJWT;
-    document.getElementById('tag-bar').style.display = loggedIn ? '' : 'none';
     document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
     document.getElementById('shell').classList.toggle('active', loggedIn);
     document.getElementById('notebook-view').classList.remove('active');
-    document.getElementById('home-btn').style.display = 'none';
 
     const signedOut = document.getElementById('signed-out-state');
     if (loggedIn) {
@@ -493,7 +480,6 @@ function showHome() {
     currentTag = '';
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-view').classList.add('active');
-    document.getElementById('home-btn').style.display = 'none';
     markActiveTag();
     loadKnownTags();
 }
@@ -536,7 +522,6 @@ async function openTag(tag) {
     document.getElementById('doc-tag-label').textContent = '#' + tag;
     document.getElementById('home-view').classList.remove('active');
     document.getElementById('notebook-view').classList.add('active');
-    document.getElementById('home-btn').style.display = '';
     markActiveTag();
     document.getElementById('doc-status').textContent = 'Loading…';
 

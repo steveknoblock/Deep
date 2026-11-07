@@ -28,7 +28,7 @@ This is the first screen whenever no notebook is open, so you can start writing 
 
 - **Sidebar (240px when open):** a scrollable list of known notebooks (tags), with `uncategorized` listed first.
 - **Main area:** a quick-compose editor. Text with a `#tag` is stored as written, and untagged text gets `#uncategorized` appended.
-- **Navigation:** the **All notebooks** button returns here from any open notebook.
+- **Navigation:** there is no button back to this view from an open notebook; reloading the page returns here.
 
 ## Design intent
 
