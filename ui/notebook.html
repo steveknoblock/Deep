@@ -59,14 +59,6 @@
             background: var(--surface);
             border-bottom: 1px solid var(--border);
         }
-        .tag-input-wrap { display: flex; gap: 6px; }
-        .tag-input {
-            background: var(--bg); border: 1px solid var(--border); color: var(--text);
-            font-family: var(--mono); font-size: 13px; padding: 6px 10px; outline: none;
-            width: 200px; transition: border-color 0.15s;
-            border-radius: var(--radius);
-        }
-        .tag-input:focus { border-color: var(--accent); }
         .btn {
             font-family: var(--sans); font-size: 12px; font-weight: 700; padding: 6px 14px;
             border: 1px solid var(--border); background: var(--surface2); color: var(--text);
@@ -273,11 +265,6 @@
 
 <div class="tag-bar" id="tag-bar" style="display:none;">
     <button class="btn" id="home-btn" onclick="showHome()" title="Back to all notebooks" style="display:none;">&#8962; All notebooks</button>
-    <div class="tag-input-wrap">
-        <input class="tag-input" id="tag-input" type="text" placeholder="tag"
-               onkeydown="if(event.key==='Enter') openTagFromInput()">
-        <button class="btn btn-primary" onclick="openTagFromInput()">Open</button>
-    </div>
 </div>
 
 <div class="empty-state" id="signed-out-state" style="display:none;"></div>
@@ -500,17 +487,10 @@ function markActiveTag() {
     });
 }
 
-function openTagFromInput() {
-    const tag = document.getElementById('tag-input').value.trim().replace(/^#/, '');
-    if (!tag) return;
-    openTag(tag);
-}
-
 // Returns to the home view (tag list + quick editor), closing whatever
 // notebook is currently open.
 function showHome() {
     currentTag = '';
-    document.getElementById('tag-input').value = '';
     document.getElementById('notebook-view').classList.remove('active');
     document.getElementById('home-view').classList.add('active');
     document.getElementById('home-btn').style.display = 'none';
@@ -553,7 +533,6 @@ async function openTag(tag) {
     const myGeneration = ++loadGeneration;
     currentTag = tag;
     mergedThisSession = new Set();
-    document.getElementById('tag-input').value = tag;
     document.getElementById('doc-tag-label').textContent = '#' + tag;
     document.getElementById('home-view').classList.remove('active');
     document.getElementById('notebook-view').classList.add('active');
