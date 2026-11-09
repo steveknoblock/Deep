@@ -3,6 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // Theme: saved choice (deep_theme) wins, otherwise follow the OS setting.
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('deep_theme'); } catch (e) {}
+            if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
     <title>Deep — Notebook</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="http://fonts.googleapis.com/css?family=Lato|Lora|Inconsolata" rel="stylesheet">
@@ -22,10 +31,35 @@
             --danger:      #cc3333;
             --danger-soft: #ff8888;
             --on-accent:   #ffffff;
+            --field-bg:    var(--surface);
+            --field-border: var(--border);
+            --toast-bg:    var(--text);
+            --toast-fg:    var(--bg);
             --radius:      6px;
             --mono:       'Inconsolata', monospace;
             --sans:        'Lato', sans-serif;
             --serif:       'Lora', serif;
+        }
+
+        /* ── Dark theme ──
+           Overrides variables only. Set data-theme="dark" on <html>. */
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg:          #000000;   /* editor panel / page */
+            --surface:     #333333;   /* header, menu bar, sidebar, post cards */
+            --surface2:    #444444;   /* buttons, hover and active highlight */
+            --border:      #3b3b3b;   /* panel borders and dividers */
+            --field-bg:    #000000;   /* text areas */
+            --field-border: #626262;
+            --accent:      #5ba3d9;
+            --accent-dim:  #4a90c8;
+            --on-accent:   #000000;
+            --text:        #ffffff;
+            --text-dim:    #b0b0b0;
+            --text-muted:  #9a9a9a;
+            --danger:      #ff6b6b;
+            --toast-bg:    #333333;
+            --toast-fg:    #ffffff;
         }
 
         html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
@@ -169,7 +203,7 @@
         }
         .doc-textarea {
             flex: 1; resize: none; width: 100%;
-            background: var(--surface); border: 1px solid var(--border); color: var(--text);
+            background: var(--field-bg); border: 1px solid var(--field-border); color: var(--text);
             font-family: var(--serif); font-size: 15px; line-height: 1.7;
             padding: 16px; outline: none; transition: border-color 0.15s;
             border-radius: var(--radius);
