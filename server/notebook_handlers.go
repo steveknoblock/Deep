@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/steveknoblock/Deep/internal/hatcheckclient"
@@ -57,7 +58,9 @@ func listNotebooksHandler(svc *notebook.Service) http.HandlerFunc {
 }
 
 // getNotebookHandler handles GET /notebook/{tag} — the composed document +
-// stream view.
+// one page of its stream. Optional query parameters: limit (page size,
+// default 50, at most 200) and before (the next_before cursor from the
+// previous page, to get older posts).
 func getNotebookHandler(svc *notebook.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		auth, ok := authFromRequest(req)
@@ -72,7 +75,21 @@ func getNotebookHandler(svc *notebook.Service) http.HandlerFunc {
 			return
 		}
 
-		view, err := svc.GetNotebook(req.Context(), auth, tag)
+		page := notebook.PageOptions{Before: req.URL.Query().Get("before")}
+		if raw := req.URL.Query().Get("limit"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 1 {
+				writeError(w, http.StatusBadRequest, "limit must be a positive integer")
+				return
+			}
+			page.Limit = n
+		}
+
+		view, err := svc.GetNotebook(req.Context(), auth, tag, page)
+		if errors.Is(err, notebook.ErrBadCursor) {
+			writeError(w, http.StatusBadRequest, "unknown before cursor")
+			return
+		}
 		if err != nil {
 			writeUpstreamError(w, err)
 			return

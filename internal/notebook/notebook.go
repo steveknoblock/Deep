@@ -8,9 +8,9 @@ package notebook
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 
@@ -46,7 +46,40 @@ type Post struct {
 type View struct {
 	Tag      string    `json:"tag"`
 	Document *Document `json:"document"`
-	Stream   []Post    `json:"stream"`
+	// Stream is one page of the tag's posts, newest first.
+	Stream []Post `json:"stream"`
+	// Total is how many live posts the tag has in all (past document
+	// versions excluded), not just on this page.
+	Total int `json:"total"`
+	// HasMore reports whether older posts exist beyond this page; if so,
+	// NextBefore is the cursor to pass as PageOptions.Before to get them.
+	HasMore    bool   `json:"has_more"`
+	NextBefore string `json:"next_before,omitempty"`
+}
+
+// DefaultPageSize and MaxPageSize bound how many posts one GetNotebook call
+// fetches. Each post costs Hatcheck round-trips, so an unbounded stream makes
+// a large notebook unusably slow to open.
+const (
+	DefaultPageSize = 50
+	MaxPageSize     = 200
+)
+
+// fetchConcurrency is how many posts are fetched from Hatcheck in parallel.
+const fetchConcurrency = 8
+
+// ErrBadCursor is returned when PageOptions.Before names a post that is not
+// in the tag's live stream (for example, a mistyped or stale cursor).
+var ErrBadCursor = errors.New("notebook: unknown page cursor")
+
+// PageOptions selects which page of a tag's stream GetNotebook returns.
+type PageOptions struct {
+	// Limit is the page size; 0 means DefaultPageSize, and anything above
+	// MaxPageSize is capped.
+	Limit int
+	// Before is the cursor from the previous page's NextBefore: the page
+	// returned holds the posts older than that post. Empty means the newest.
+	Before string
 }
 
 // Service implements the Notebook application against a Hatcheck server.
@@ -168,11 +201,17 @@ func (s *Service) currentDocumentHash(ctx context.Context, auth hatcheckclient.A
 	return "", nil
 }
 
-// GetNotebook assembles the full view for a tag: its current document (if
-// any) plus its stream, with every past document version excluded. This
-// single call replaces what used to be five-plus independent, unordered
+// GetNotebook assembles the view for a tag: its current document (if any)
+// plus one page of its stream, with every past document version excluded.
+// This single call replaces what used to be five-plus independent, unordered
 // round-trips from the browser.
-func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthContext, tag string) (*View, error) {
+//
+// The stream is paged because opening a post costs Hatcheck round-trips:
+// fetching every post in a tag with thousands of them made the notebook
+// effectively impossible to open. Hatcheck's tag query returns hashes in the
+// order they were stored, so Deep pages from the newest end without fetching
+// the posts it skips, and the cursor is the hash of the last post returned.
+func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthContext, tag string, page PageOptions) (*View, error) {
 	docHash, err := s.currentDocumentHash(ctx, auth, tag)
 	if err != nil {
 		return nil, fmt.Errorf("resolving document: %w", err)
@@ -201,28 +240,71 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 		}
 	}
 
-	posts := make([]Post, 0, len(hashes))
-	for _, hash := range hashes {
-		if superseded[hash] {
-			continue
+	// Newest first, with every past document version left out.
+	live := make([]string, 0, len(hashes))
+	for i := len(hashes) - 1; i >= 0; i-- {
+		if !superseded[hashes[i]] {
+			live = append(live, hashes[i])
 		}
-		post := s.fetchPost(ctx, auth, hash)
-		post.Merged = merged[hash]
-		posts = append(posts, post)
 	}
 
-	sort.Slice(posts, func(i, j int) bool {
-		// Posts with no known creation time (failed loads) sort last.
-		if posts[i].Created == "" {
-			return false
+	start := 0
+	if page.Before != "" {
+		idx := -1
+		for i, h := range live {
+			if h == page.Before {
+				idx = i
+				break
+			}
 		}
-		if posts[j].Created == "" {
-			return true
+		if idx < 0 {
+			return nil, ErrBadCursor
 		}
-		return posts[i].Created > posts[j].Created
-	})
+		start = idx + 1
+	}
 
-	return &View{Tag: tag, Document: doc, Stream: posts}, nil
+	limit := page.Limit
+	if limit <= 0 {
+		limit = DefaultPageSize
+	}
+	if limit > MaxPageSize {
+		limit = MaxPageSize
+	}
+	end := start + limit
+	if end > len(live) {
+		end = len(live)
+	}
+
+	posts := s.fetchPosts(ctx, auth, live[start:end])
+	for i := range posts {
+		posts[i].Merged = merged[posts[i].Hash]
+	}
+
+	view := &View{Tag: tag, Document: doc, Stream: posts, Total: len(live)}
+	if end < len(live) && len(posts) > 0 {
+		view.HasMore = true
+		view.NextBefore = posts[len(posts)-1].Hash
+	}
+	return view, nil
+}
+
+// fetchPosts fetches the given posts from Hatcheck a few at a time,
+// returning them in the same order as hashes.
+func (s *Service) fetchPosts(ctx context.Context, auth hatcheckclient.AuthContext, hashes []string) []Post {
+	posts := make([]Post, len(hashes))
+	sem := make(chan struct{}, fetchConcurrency)
+	var wg sync.WaitGroup
+	for i, h := range hashes {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, h string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			posts[i] = s.fetchPost(ctx, auth, h)
+		}(i, h)
+	}
+	wg.Wait()
+	return posts
 }
 
 // fetchPost retrieves a post's content and metadata, returning a Post

@@ -203,6 +203,17 @@
             overflow-y: auto;
         }
         .stream-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 30px 0; }
+        .stream-more {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            padding: 8px 0 20px; font-size: 11px; color: var(--text-muted);
+        }
+        .stream-more-btn {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+            color: var(--accent); background: transparent; border: 1px solid var(--accent);
+            padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+        }
+        .stream-more-btn:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+        .stream-more-btn:disabled { opacity: 0.5; cursor: default; }
 
         .post {
             background: var(--surface); border: 1px solid var(--border);
@@ -312,6 +323,7 @@
 
             <section class="flow-scroll" id="flow-right">
                 <div id="stream-list"></div>
+                <div class="stream-more" id="stream-more" style="display:none"></div>
             </section>
         </section>
     </div>
@@ -403,6 +415,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Notebook state ──
 let currentTag = '';
 let streamCache = {}; // hash -> content, for the merge action
+// Paging state for the open notebook's stream. The server returns the newest
+// posts first and a cursor (next_before) for the next older page.
+let streamNext = '';     // cursor for the next older page ('' when there is none)
+let streamLoaded = 0;    // posts shown so far
+let streamTotal = 0;     // posts the notebook has in all
+let streamLoading = false;
 let mergedThisSession = new Set(); // post hashes merged since the last save
 
 // Shows a message in the tag list panel instead of leaving it blank.
@@ -546,23 +564,9 @@ async function openTag(tag) {
     loadKnownTags();
 }
 
-function renderNotebook(view) {
-    document.getElementById('doc-textarea').value = view.document ? view.document.content : '';
-    document.getElementById('doc-status').textContent = view.document
-        ? 'Loaded.'
-        : 'No document yet for #' + view.tag + ' — save to create one.';
-
-    streamCache = {};
-    const listEl = document.getElementById('stream-list');
-
-    if (!view.stream || view.stream.length === 0) {
-        listEl.innerHTML = '<div class="stream-empty">No posts tagged #' + escHtml(view.tag) + ' yet.</div>';
-        return;
-    }
-
-    view.stream.forEach(p => { if (!p.failed) streamCache[p.hash] = p.content; });
-
-    listEl.innerHTML = view.stream.map(p => p.failed ? `
+// One post's markup. Shared by the first page and by "load older posts".
+function postHtml(p) {
+    return p.failed ? `
         <div class="post post-failed">
             <div class="post-meta">
                 <span class="post-date">Failed to load</span>
@@ -579,7 +583,71 @@ function renderNotebook(view) {
             </div>
             <div class="post-body">${escHtml(p.content)}</div>
         </div>
-    `).join('');
+    `;
+}
+
+// Shows how many posts are loaded and, when older ones remain, the button
+// that fetches the next page.
+function updateStreamFooter() {
+    const el = document.getElementById('stream-more');
+    if (streamTotal === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    const counts = `<span>Showing ${streamLoaded.toLocaleString()} of ${streamTotal.toLocaleString()} posts</span>`;
+    el.innerHTML = streamNext
+        ? counts + `<button class="stream-more-btn" id="stream-more-btn" onclick="loadMorePosts()">Load older posts</button>`
+        : counts;
+}
+
+function renderNotebook(view) {
+    document.getElementById('doc-textarea').value = view.document ? view.document.content : '';
+    document.getElementById('doc-status').textContent = view.document
+        ? 'Loaded.'
+        : 'No document yet for #' + view.tag + ' — save to create one.';
+
+    streamCache = {};
+    streamNext = view.has_more ? (view.next_before || '') : '';
+    streamTotal = view.total || (view.stream ? view.stream.length : 0);
+    streamLoaded = view.stream ? view.stream.length : 0;
+    streamLoading = false;
+    const listEl = document.getElementById('stream-list');
+
+    if (!view.stream || view.stream.length === 0) {
+        listEl.innerHTML = '<div class="stream-empty">No posts tagged #' + escHtml(view.tag) + ' yet.</div>';
+        updateStreamFooter();
+        return;
+    }
+
+    view.stream.forEach(p => { if (!p.failed) streamCache[p.hash] = p.content; });
+    listEl.innerHTML = view.stream.map(postHtml).join('');
+    updateStreamFooter();
+}
+
+// Fetches the next older page and appends it. Unlike openTag, this never
+// touches the document textarea, so unsaved edits and merges are safe.
+async function loadMorePosts() {
+    if (!streamNext || streamLoading) return;
+    const tag = currentTag;
+    const generation = loadGeneration;
+    streamLoading = true;
+    const btn = document.getElementById('stream-more-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    try {
+        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}?before=${encodeURIComponent(streamNext)}`);
+        if (!res.ok) throw new Error((await res.text()).trim() || 'failed to load older posts');
+        const view = await res.json();
+        if (generation !== loadGeneration || tag !== currentTag) return; // a different notebook was opened meanwhile
+        const posts = view.stream || [];
+        posts.forEach(p => { if (!p.failed) streamCache[p.hash] = p.content; });
+        document.getElementById('stream-list').insertAdjacentHTML('beforeend', posts.map(postHtml).join(''));
+        streamLoaded += posts.length;
+        streamTotal = view.total || streamTotal;
+        streamNext = view.has_more ? (view.next_before || '') : '';
+    } catch (err) {
+        showToast('Load failed', err.message, true);
+    } finally {
+        streamLoading = false;
+        if (generation === loadGeneration) updateStreamFooter();
+    }
 }
 
 // Inserts a post's content into the document textarea at the current
