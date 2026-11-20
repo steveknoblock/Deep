@@ -1,6 +1,3 @@
-cd projects/Deep/
-git fetch
-git pull
-go build ./...
+cd projects/deep/
 set -a && source .env && set +a
 go run ./server
