@@ -36,6 +36,24 @@
             --field-border: var(--border);
             --toast-bg:    var(--text);
             --toast-fg:    var(--bg);
+            /* Rifle Paper Co. swatches (used by the "rpc-dark" theme) */
+            --rpc-classic-charcoal: #272727;
+            --rpc-classic-deep-green: #294133;
+            --rpc-classic-forest-green: #214232;
+            --rpc-classic-warm-cream: #F7F3ED;
+            --rpc-classic-deep-navy: #272D45;
+            --rpc-classic-muted-periwinkle: #676986;
+            --rpc-classic-warm-gold: #867456;
+            --rpc-classic-crimson: #A81E2C;
+            --rpc-classic-coral-orange: #FD9162;
+            --rpc-classic-blush-pink: #F89492;
+            --rpc-floral-obsidian-black: #181818;
+            --rpc-floral-midnight-noir: #1E2028;
+            --rpc-floral-magenta-rose: #D94E70;
+            --rpc-floral-marigold-yellow: #F2B749;
+            --rpc-floral-botanical-teal: #2B7A78;
+            --rpc-floral-sage-leaf: #5E8C6A;
+            --rpc-floral-lavender-mist: #A594B8;
             --radius:      6px;
             --mono:       'Inconsolata', monospace;
             --sans:        'Lato', sans-serif;
@@ -62,6 +80,30 @@
             --danger:      #ff6b6b;
             --toast-bg:    #333333;
             --toast-fg:    #ffffff;
+        }
+
+        /* ── Rifle Paper Co. dark theme ──
+           Same variables as the dark theme, mapped to the RPC swatches.
+           Set data-theme="rpc-dark" on <html>. */
+        :root[data-theme="rpc-dark"] {
+            color-scheme: dark;
+            --bg:          var(--rpc-floral-obsidian-black);   /* editor panel / page */
+            --surface:     var(--rpc-floral-midnight-noir);    /* header, menu bar, sidebar, post cards */
+            --surface2:    var(--rpc-classic-deep-navy);       /* buttons, hover and active highlight */
+            --border:      var(--rpc-classic-charcoal);
+            --rail-bg:     var(--surface);
+            --field-bg:    var(--rpc-floral-obsidian-black);   /* text areas */
+            --field-border: var(--rpc-floral-midnight-noir);
+            --accent:      var(--rpc-floral-marigold-yellow);
+            --accent-dim:  var(--rpc-classic-coral-orange);
+            --on-accent:   var(--rpc-floral-obsidian-black);
+            --text:        var(--rpc-classic-warm-cream);
+            --text-dim:    var(--rpc-floral-lavender-mist);
+            --text-muted:  var(--rpc-floral-sage-leaf);
+            --danger:      var(--rpc-floral-magenta-rose);
+            --danger-soft: var(--rpc-classic-blush-pink);
+            --toast-bg:    var(--rpc-classic-deep-navy);
+            --toast-fg:    var(--rpc-classic-warm-cream);
         }
 
         html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
