@@ -247,6 +247,29 @@ func (c *Client) Relations(ctx context.Context, auth AuthContext, hash string) (
 	return parsed.Outgoing, parsed.Incoming, nil
 }
 
+// RelationsByPredicate returns every relation in Hatcheck's log with the
+// given predicate, in the order they were recorded, from a single request
+// (GET /relations?rel=). Order matters to callers that treat a predicate as
+// a toggle: for a given From, the last entry wins.
+func (c *Client) RelationsByPredicate(ctx context.Context, auth AuthContext, rel string) ([]Relation, error) {
+	path := "/relations?rel=" + url.QueryEscape(rel)
+	res, err := c.doRequest(ctx, http.MethodGet, path, nil, auth, "")
+	if err != nil {
+		return nil, err
+	}
+	body, err := readAndCheck(res)
+	if err != nil {
+		return nil, err
+	}
+	var parsed struct {
+		Relations []Relation `json:"relations"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("hatcheckclient: malformed relations response: %w", err)
+	}
+	return parsed.Relations, nil
+}
+
 // CreateRelation records a new relation. Hatcheck's /relation endpoint
 // doesn't check capability at all, so no capability override is needed here.
 func (c *Client) CreateRelation(ctx context.Context, auth AuthContext, from, rel, to string) error {

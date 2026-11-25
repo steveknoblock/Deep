@@ -59,8 +59,9 @@ func listNotebooksHandler(svc *notebook.Service) http.HandlerFunc {
 
 // getNotebookHandler handles GET /notebook/{tag} — the composed document +
 // one page of its stream. Optional query parameters: limit (page size,
-// default 50, at most 200) and before (the next_before cursor from the
-// previous page, to get older posts).
+// default 50, at most 200), before (the next_before cursor from the
+// previous page, to get older posts), and archived (true to include archived
+// posts, which are hidden by default).
 func getNotebookHandler(svc *notebook.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		auth, ok := authFromRequest(req)
@@ -83,6 +84,15 @@ func getNotebookHandler(svc *notebook.Service) http.HandlerFunc {
 				return
 			}
 			page.Limit = n
+		}
+
+		if raw := req.URL.Query().Get("archived"); raw != "" {
+			include, err := strconv.ParseBool(raw)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "archived must be true or false")
+				return
+			}
+			page.IncludeArchived = include
 		}
 
 		view, err := svc.GetNotebook(req.Context(), auth, tag, page)
@@ -177,6 +187,31 @@ func createPlainPostHandler(svc *notebook.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, post)
+	}
+}
+
+// setArchivedHandler handles POST /posts/{hash}/archive and
+// POST /posts/{hash}/unarchive. Archiving only records a relation on the
+// post, so it is reversible and the post itself never changes.
+func setArchivedHandler(svc *notebook.Service, archived bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		auth, ok := authFromRequest(req)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "missing or malformed Authorization header")
+			return
+		}
+
+		hash := req.PathValue("hash")
+		if hash == "" {
+			writeError(w, http.StatusBadRequest, "post hash is required")
+			return
+		}
+
+		if err := svc.SetArchived(req.Context(), auth, hash, archived); err != nil {
+			writeUpstreamError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"hash": hash, "archived": archived})
 	}
 }
 

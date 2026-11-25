@@ -14,6 +14,8 @@ func registerRoutes(mux *http.ServeMux, svc *notebook.Service, cfg Config) {
 	mux.Handle("POST /notebook/{tag}/document", saveDocumentHandler(svc))
 	mux.Handle("POST /notebook/{tag}/posts", createPostHandler(svc))
 	mux.Handle("POST /posts", createPlainPostHandler(svc))
+	mux.Handle("POST /posts/{hash}/archive", setArchivedHandler(svc, true))
+	mux.Handle("POST /posts/{hash}/unarchive", setArchivedHandler(svc, false))
 
 	// Deep serves its own UI, same static-file pattern as Hatcheck's /ui/.
 	mux.Handle("/ui/", http.StripPrefix("/ui/", http.FileServer(http.Dir(cfg.UIPath))))

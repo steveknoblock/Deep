@@ -234,6 +234,25 @@
             font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
             color: var(--accent-dim); cursor: help;
         }
+        .post-archive {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+            color: var(--text-muted); background: transparent; border: 1px solid var(--border);
+            padding: 3px 8px; cursor: pointer; transition: all 0.15s;
+        }
+        .post-archive:hover:not(:disabled) { color: var(--text); border-color: var(--text-muted); }
+        .post-archive:disabled { opacity: 0.5; cursor: default; }
+        .post-archived { border-style: dashed; }
+        .post-archived .post-body { opacity: 0.6; }
+        .post-archived-badge {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+            color: var(--text-muted);
+        }
+        .stream-toggle-btn {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+            color: var(--text-muted); background: transparent; border: 1px solid var(--border);
+            padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+        }
+        .stream-toggle-btn:hover { color: var(--text); border-color: var(--text-muted); }
         .post-body {
             font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap;
         }
@@ -419,7 +438,10 @@ let streamCache = {}; // hash -> content, for the merge action
 // posts first and a cursor (next_before) for the next older page.
 let streamNext = '';     // cursor for the next older page ('' when there is none)
 let streamLoaded = 0;    // posts shown so far
-let streamTotal = 0;     // posts the notebook has in all
+let streamTotal = 0;     // posts the notebook has in all (archived ones only when shown)
+let streamArchived = 0;  // posts in this notebook that are archived, shown or not
+let showArchived = false; // whether archived posts are included in the stream
+let streamPosts = {};    // hash -> post, so a post can be redrawn after (un)archiving
 let streamLoading = false;
 let mergedThisSession = new Set(); // post hashes merged since the last save
 
@@ -550,7 +572,7 @@ async function openTag(tag) {
     document.getElementById('doc-status').textContent = 'Loading…';
 
     try {
-        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}`);
+        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}${showArchived ? '?archived=true' : ''}`);
         if (!res.ok) throw new Error('failed to load notebook');
         const view = await res.json();
         if (myGeneration !== loadGeneration) return; // a newer open has since started
@@ -575,10 +597,12 @@ function postHtml(p) {
             <div class="post-body post-body-failed">This post couldn't be fetched from Hatcheck. Retry to reload.</div>
         </div>
     ` : `
-        <div class="post">
+        <div class="post${p.archived ? ' post-archived' : ''}" data-hash="${escAttr(p.hash)}">
             <div class="post-meta">
                 <span class="post-date">${p.created ? escHtml(new Date(p.created).toLocaleString()) : 'unknown date'}</span>
+                ${p.archived ? '<span class="post-archived-badge" title="Archived — hidden from the stream unless archived posts are shown. The post itself is unchanged.">Archived</span>' : ''}
                 ${p.merged ? '<span class="post-merged-badge" title="Merged into a saved version of this document at some point — later edits may have changed or removed that text since.">&check; Merged</span>' : ''}
+                <button class="post-archive" onclick="archivePost('${escAttr(p.hash)}', ${p.archived ? 'false' : 'true'}, this)">${p.archived ? 'Unarchive' : 'Archive'}</button>
                 <button class="post-merge" onclick="mergePost('${escAttr(p.hash)}')">Merge &rarr;</button>
             </div>
             <div class="post-body">${escHtml(p.content)}</div>
@@ -586,16 +610,83 @@ function postHtml(p) {
     `;
 }
 
+// Archives or unarchives one post. Archiving is global — the post is hidden in
+// every notebook it appears in — and reversible; the post itself never changes.
+// The stream is updated in place rather than reloaded, so the document
+// textarea (and any unsaved merges), the scroll position, and the pages
+// already loaded are all left alone.
+async function archivePost(hash, archive, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        const res = await apiFetch(`${API}/posts/${encodeURIComponent(hash)}/${archive ? 'archive' : 'unarchive'}`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.text()).trim() || 'request failed');
+    } catch (err) {
+        if (btn) btn.disabled = false;
+        showToast(archive ? 'Archive failed' : 'Unarchive failed', err.message, true);
+        return;
+    }
+
+    const post = streamPosts[hash];
+    const el = document.querySelector(`#stream-list [data-hash="${CSS.escape(hash)}"]`);
+    streamArchived = Math.max(0, streamArchived + (archive ? 1 : -1));
+    if (post) post.archived = archive;
+
+    if (archive && !showArchived) {
+        // Hidden by default: take it out of the list and the counts.
+        if (el) el.remove();
+        streamLoaded = Math.max(0, streamLoaded - 1);
+        streamTotal = Math.max(0, streamTotal - 1);
+        if (streamLoaded === 0 && !streamNext) showEmptyStream();
+    } else if (el && post) {
+        el.outerHTML = postHtml(post); // shown anyway: redraw with its new state
+    }
+    updateStreamFooter();
+}
+
+// Shown when no post is visible in the stream.
+function showEmptyStream() {
+    const hiddenNote = streamArchived > 0 && !showArchived;
+    document.getElementById('stream-list').innerHTML = '<div class="stream-empty">'
+        + (hiddenNote ? 'Every post in #' + escHtml(currentTag) + ' is archived.' : 'No posts tagged #' + escHtml(currentTag) + ' yet.')
+        + '</div>';
+}
+
+// Switches between hiding and showing archived posts, then reloads the stream
+// from its newest page. Only the stream is reloaded — never the document.
+async function toggleArchived() {
+    if (!currentTag || streamLoading) return;
+    const tag = currentTag;
+    const generation = loadGeneration;
+    showArchived = !showArchived;
+    streamLoading = true;
+    try {
+        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}${showArchived ? '?archived=true' : ''}`);
+        if (!res.ok) throw new Error((await res.text()).trim() || 'failed to load posts');
+        const view = await res.json();
+        if (generation !== loadGeneration || tag !== currentTag) return;
+        renderStream(view);
+    } catch (err) {
+        showArchived = !showArchived; // the view didn't change, so neither did the setting
+        showToast('Load failed', err.message, true);
+    } finally {
+        streamLoading = false;
+        if (generation === loadGeneration) updateStreamFooter();
+    }
+}
+
 // Shows how many posts are loaded and, when older ones remain, the button
 // that fetches the next page.
 function updateStreamFooter() {
     const el = document.getElementById('stream-more');
-    if (streamTotal === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    if (streamTotal === 0 && streamArchived === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
     el.style.display = 'flex';
     const counts = `<span>Showing ${streamLoaded.toLocaleString()} of ${streamTotal.toLocaleString()} posts</span>`;
-    el.innerHTML = streamNext
-        ? counts + `<button class="stream-more-btn" id="stream-more-btn" onclick="loadMorePosts()">Load older posts</button>`
-        : counts;
+    const toggle = streamArchived > 0
+        ? `<button class="stream-toggle-btn" onclick="toggleArchived()">${showArchived ? 'Hide archived' : `Show ${streamArchived.toLocaleString()} archived`}</button>`
+        : '';
+    el.innerHTML = counts + toggle + (streamNext
+        ? `<button class="stream-more-btn" id="stream-more-btn" onclick="loadMorePosts()">Load older posts</button>`
+        : '');
 }
 
 function renderNotebook(view) {
@@ -603,21 +694,29 @@ function renderNotebook(view) {
     document.getElementById('doc-status').textContent = view.document
         ? 'Loaded.'
         : 'No document yet for #' + view.tag + ' — save to create one.';
+    renderStream(view);
+}
 
+// Renders the stream half of a notebook view: the post list, its counts and
+// its footer. Kept apart from the document so the stream can be reloaded
+// (e.g. to show archived posts) without touching the document textarea.
+function renderStream(view) {
     streamCache = {};
+    streamPosts = {};
     streamNext = view.has_more ? (view.next_before || '') : '';
     streamTotal = view.total || (view.stream ? view.stream.length : 0);
+    streamArchived = view.archived_count || 0;
     streamLoaded = view.stream ? view.stream.length : 0;
     streamLoading = false;
     const listEl = document.getElementById('stream-list');
 
     if (!view.stream || view.stream.length === 0) {
-        listEl.innerHTML = '<div class="stream-empty">No posts tagged #' + escHtml(view.tag) + ' yet.</div>';
+        showEmptyStream();
         updateStreamFooter();
         return;
     }
 
-    view.stream.forEach(p => { if (!p.failed) streamCache[p.hash] = p.content; });
+    view.stream.forEach(p => { if (!p.failed) { streamCache[p.hash] = p.content; streamPosts[p.hash] = p; } });
     listEl.innerHTML = view.stream.map(postHtml).join('');
     updateStreamFooter();
 }
@@ -632,15 +731,16 @@ async function loadMorePosts() {
     const btn = document.getElementById('stream-more-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
     try {
-        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}?before=${encodeURIComponent(streamNext)}`);
+        const res = await apiFetch(`${API}/notebook/${encodeURIComponent(tag)}?before=${encodeURIComponent(streamNext)}${showArchived ? '&archived=true' : ''}`);
         if (!res.ok) throw new Error((await res.text()).trim() || 'failed to load older posts');
         const view = await res.json();
         if (generation !== loadGeneration || tag !== currentTag) return; // a different notebook was opened meanwhile
         const posts = view.stream || [];
-        posts.forEach(p => { if (!p.failed) streamCache[p.hash] = p.content; });
+        posts.forEach(p => { if (!p.failed) { streamCache[p.hash] = p.content; streamPosts[p.hash] = p; } });
         document.getElementById('stream-list').insertAdjacentHTML('beforeend', posts.map(postHtml).join(''));
         streamLoaded += posts.length;
         streamTotal = view.total || streamTotal;
+        streamArchived = view.archived_count ?? streamArchived;
         streamNext = view.has_more ? (view.next_before || '') : '';
     } catch (err) {
         showToast('Load failed', err.message, true);

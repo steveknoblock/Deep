@@ -38,7 +38,25 @@ type Post struct {
 	// reflects that a merge happened, not that the post's text is still
 	// present in the document now — later edits could have removed it.
 	Merged bool `json:"merged,omitempty"`
+	// Archived is true if the post is currently archived. Archived posts are
+	// only returned when the caller asked for them (PageOptions.IncludeArchived).
+	Archived bool `json:"archived,omitempty"`
 }
+
+// RelArchived is the relation predicate that records a post's archived
+// state. It is a single predicate, with the state in the relation's "to"
+// field (ArchivedTrue / ArchivedFalse), rather than separate "archived" and
+// "unarchived" predicates: relations carry no timestamp, so entries under two
+// different predicates can't be ordered against each other, whereas entries
+// under one predicate keep their log order — and for a given post the last
+// one wins. Archiving never changes the post itself (its hash and text stay
+// as they were), so it is reversible and applies to the post in every
+// notebook it appears in.
+const (
+	RelArchived   = "archived"
+	ArchivedTrue  = "true"
+	ArchivedFalse = "false"
+)
 
 // View is the composed response for a tag: its current document (nil if
 // none exists yet) and its live stream, with every past document version
@@ -48,9 +66,13 @@ type View struct {
 	Document *Document `json:"document"`
 	// Stream is one page of the tag's posts, newest first.
 	Stream []Post `json:"stream"`
-	// Total is how many live posts the tag has in all (past document
-	// versions excluded), not just on this page.
+	// Total is how many posts the tag has in all that this view covers, not
+	// just on this page: past document versions are never counted, and
+	// archived posts are counted only when PageOptions.IncludeArchived is set.
 	Total int `json:"total"`
+	// ArchivedCount is how many of the tag's posts are archived, whether or
+	// not this view includes them, so the UI can offer "Show N archived".
+	ArchivedCount int `json:"archived_count"`
 	// HasMore reports whether older posts exist beyond this page; if so,
 	// NextBefore is the cursor to pass as PageOptions.Before to get them.
 	HasMore    bool   `json:"has_more"`
@@ -80,6 +102,9 @@ type PageOptions struct {
 	// Before is the cursor from the previous page's NextBefore: the page
 	// returned holds the posts older than that post. Empty means the newest.
 	Before string
+	// IncludeArchived keeps archived posts in the stream (each flagged
+	// Archived). By default they are hidden.
+	IncludeArchived bool
 }
 
 // Service implements the Notebook application against a Hatcheck server.
@@ -240,6 +265,11 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 		}
 	}
 
+	archived, err := s.archivedPosts(ctx, auth)
+	if err != nil {
+		return nil, fmt.Errorf("reading archived posts: %w", err)
+	}
+
 	// Newest first, with every past document version left out.
 	live := make([]string, 0, len(hashes))
 	for i := len(hashes) - 1; i >= 0; i-- {
@@ -248,19 +278,39 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 		}
 	}
 
-	start := 0
+	// The cursor is resolved against the live list *before* archived posts
+	// are removed, so a cursor that names a post archived since the previous
+	// page was fetched still works instead of turning into ErrBadCursor.
+	cursor := -1
 	if page.Before != "" {
-		idx := -1
 		for i, h := range live {
 			if h == page.Before {
-				idx = i
+				cursor = i
 				break
 			}
 		}
-		if idx < 0 {
+		if cursor < 0 {
 			return nil, ErrBadCursor
 		}
-		start = idx + 1
+	}
+
+	// Archived posts are dropped here, before the list is sliced into pages,
+	// so every page is full and Total counts what the caller can actually
+	// page through. (Filtering after slicing would leave gaps in pages.)
+	total, archivedCount := 0, 0
+	var remaining []string // visible posts older than the cursor
+	for i, h := range live {
+		isArchived := archived[h]
+		if isArchived {
+			archivedCount++
+			if !page.IncludeArchived {
+				continue
+			}
+		}
+		total++
+		if i > cursor {
+			remaining = append(remaining, h)
+		}
 	}
 
 	limit := page.Limit
@@ -270,22 +320,61 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 	if limit > MaxPageSize {
 		limit = MaxPageSize
 	}
-	end := start + limit
-	if end > len(live) {
-		end = len(live)
+	end := limit
+	if end > len(remaining) {
+		end = len(remaining)
 	}
 
-	posts := s.fetchPosts(ctx, auth, live[start:end])
+	posts := s.fetchPosts(ctx, auth, remaining[:end])
 	for i := range posts {
 		posts[i].Merged = merged[posts[i].Hash]
+		posts[i].Archived = archived[posts[i].Hash]
 	}
 
-	view := &View{Tag: tag, Document: doc, Stream: posts, Total: len(live)}
-	if end < len(live) && len(posts) > 0 {
+	view := &View{Tag: tag, Document: doc, Stream: posts, Total: total, ArchivedCount: archivedCount}
+	if end < len(remaining) && len(posts) > 0 {
 		view.HasMore = true
 		view.NextBefore = posts[len(posts)-1].Hash
 	}
 	return view, nil
+}
+
+// archivedPosts returns the set of post hashes that are currently archived.
+// It reads every RelArchived relation in one request and replays them in log
+// order, so for each post the most recent entry decides: archived, then
+// unarchived, then archived again leaves it archived.
+func (s *Service) archivedPosts(ctx context.Context, auth hatcheckclient.AuthContext) (map[string]bool, error) {
+	rels, err := s.Hatcheck.RelationsByPredicate(ctx, auth, RelArchived)
+	if err != nil {
+		return nil, err
+	}
+	archived := make(map[string]bool)
+	for _, r := range rels {
+		archived[r.From] = r.To == ArchivedTrue
+	}
+	// Drop the posts whose latest entry was "unarchived", so the map holds
+	// only what is archived now.
+	for h, isArchived := range archived {
+		if !isArchived {
+			delete(archived, h)
+		}
+	}
+	return archived, nil
+}
+
+// SetArchived archives or unarchives the post with the given hash by
+// recording a relation on it; the post itself is never modified. It is safe
+// to repeat — the latest entry wins — and it applies to the post in every
+// notebook it appears in.
+func (s *Service) SetArchived(ctx context.Context, auth hatcheckclient.AuthContext, hash string, archived bool) error {
+	state := ArchivedFalse
+	if archived {
+		state = ArchivedTrue
+	}
+	if err := s.Hatcheck.CreateRelation(ctx, auth, hash, RelArchived, state); err != nil {
+		return fmt.Errorf("recording archived state: %w", err)
+	}
+	return nil
 }
 
 // fetchPosts fetches the given posts from Hatcheck a few at a time,

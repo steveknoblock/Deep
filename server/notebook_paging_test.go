@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -22,6 +23,13 @@ type fakeHatcheck struct {
 	docHash    string
 	oldVersion string
 	fetched    atomic.Int64 // post fetches, so tests can see paging skip work
+
+	// archiveLog is the "archived" relations in log order, as GET
+	// /relations?rel=archived returns them. Relations posted to /relation
+	// are appended to it, so a test can archive through Deep and read back.
+	mu         sync.Mutex
+	archiveLog []hatcheckclient.Relation
+	posted     []hatcheckclient.Relation // every relation posted, any predicate
 }
 
 func (f *fakeHatcheck) hashes() []string {
@@ -46,7 +54,31 @@ func (f *fakeHatcheck) handler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(names)
 	case "/query":
 		json.NewEncoder(w).Encode(f.hashes())
+	case "/relation":
+		var rel hatcheckclient.Relation
+		if err := json.NewDecoder(r.Body).Decode(&rel); err != nil {
+			http.Error(w, "bad body", http.StatusBadRequest)
+			return
+		}
+		f.mu.Lock()
+		f.posted = append(f.posted, rel)
+		if rel.Rel == notebook.RelArchived {
+			f.archiveLog = append(f.archiveLog, rel)
+		}
+		f.mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"hash":"rel"}`))
 	case "/relations":
+		if rel := q.Get("rel"); rel != "" && q.Get("hash") == "" {
+			f.mu.Lock()
+			out := []hatcheckclient.Relation{}
+			if rel == notebook.RelArchived {
+				out = append(out, f.archiveLog...)
+			}
+			f.mu.Unlock()
+			json.NewEncoder(w).Encode(map[string]any{"relations": out})
+			return
+		}
 		out := []hatcheckclient.Relation{}
 		if q.Get("hash") == f.docHash && f.oldVersion != "" {
 			out = append(out, hatcheckclient.Relation{From: f.docHash, Rel: "supersedes", To: f.oldVersion})
@@ -75,14 +107,16 @@ func (f *fakeHatcheck) handler(w http.ResponseWriter, r *http.Request) {
 type pageResult struct {
 	Tag    string `json:"tag"`
 	Stream []struct {
-		Hash    string `json:"hash"`
-		Content string `json:"content"`
-		Failed  bool   `json:"failed"`
-		Merged  bool   `json:"merged"`
+		Hash     string `json:"hash"`
+		Content  string `json:"content"`
+		Failed   bool   `json:"failed"`
+		Merged   bool   `json:"merged"`
+		Archived bool   `json:"archived"`
 	} `json:"stream"`
-	Total      int    `json:"total"`
-	HasMore    bool   `json:"has_more"`
-	NextBefore string `json:"next_before"`
+	Total         int    `json:"total"`
+	ArchivedCount int    `json:"archived_count"`
+	HasMore       bool   `json:"has_more"`
+	NextBefore    string `json:"next_before"`
 }
 
 func getPage(t *testing.T, f *fakeHatcheck, query string) (*httptest.ResponseRecorder, pageResult) {
