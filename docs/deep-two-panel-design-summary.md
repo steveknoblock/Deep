@@ -1,6 +1,6 @@
 # Deep: Two-Panel Design Summary
 
-Oct 30, 2026 · @Steve
+Oct 30, 2026 · updated Nov 25, 2026 · @Steve
 
 ## Overview
 
@@ -18,9 +18,10 @@ Deep's UI is one page (`ui/notebook.html`, `develop` branch). From left to right
 Shown when a topic (`#tag`) is open: the left panel holds the document, and the right panel holds the posts that feed it.
 
 - **Left panel (sticky):** the notebook's Markdown document in a plain textarea, with the `#tag` label above it and a status line and Save button below. The document is edited as Markdown source rather than in a rich text editor.
-- **Right panel (scrolling):** the stream of every post carrying that tag, newest first. Each post shows its date, a "Merged" badge if it has been merged before, and a **Merge →** button.
+- **Right panel (scrolling):** the stream of posts carrying that tag, newest first, one page at a time (50 posts by default). A **Load older posts** button under the list adds the next page without touching the document text. Each post shows its date, a "Merged" badge if it has been merged before, an "Archived" badge if it is archived, a **Merge →** button, and an **Archive** / **Unarchive** button.
 - **Merge:** inserts the post's text into the document at the cursor, or over the current selection, adding paragraph breaks as needed. The status then reads "Merged — not yet saved."
 - **Save:** creates a new immutable document version that supersedes the previous one and records which posts were merged in. The view then reloads, so the stream and badges refresh.
+- **Archive:** sets a post aside without deleting it. Archiving is global, so an archived post is hidden in every notebook it appears in, and it never changes the post's text. Archived posts are left out of the stream by default. The footer shows the count ("Showing X of Y posts") and a **Show N archived** / **Hide archived** toggle. Archiving, unarchiving and the toggle update the stream in place and never reload the document text.
 
 ## Home view
 
