@@ -11,12 +11,9 @@ Deep is a separate service, not part of Hatcheck. It talks to Hatcheck over plai
 Deep adds no new storage types to Hatcheck. It composes the primitives Hatcheck already has:
 
 - **A post** is an ordinary stash. A post written in a notebook always carries its `#tag`, so Hatcheck's tag index gathers the stream.
-- **The document** is also an ordinary stash. It is distinguished only by the Hatcheck name `notebook/<tag>`, which points at its current version.
-- **Saving the document** stashes the new text, points `notebook/<tag>` at it, and records a `deep:supersedes` relation from the new version to the one before. Old versions are never changed or deleted.
-- **Merging** records a `deep:merged-from` relation from the new document version to each post that was merged in.
 - **The document** is also an ordinary stash. It is distinguished only by the Hatcheck name `deep/notebook/<tag>`, which points at its current version.
-- **Saving the document** stashes the new text, points `deep/notebook/<tag>` at it, and records a `supersedes` relation from the new version to the one before. Old versions are never changed or deleted. Documents saved before the `deep/` prefix was adopted live under `notebook/<tag>`; they are still read, and saving one writes its name under `deep/notebook/<tag>`.
-- **Merging** records a `merged-from` relation from the new document version to each post that was merged in.
+- **Saving the document** stashes the new text, points `deep/notebook/<tag>` at it, and records a `deep:supersedes` relation from the new version to the one before. Old versions are never changed or deleted. Documents saved before the `deep/` prefix was adopted live under `notebook/<tag>`; they are still read, and saving one writes its name under `deep/notebook/<tag>`.
+- **Merging** records a `deep:merged-from` relation from the new document version to each post that was merged in.
 - **The stream** is every post with the tag, newest first, except the document's own versions. Without that exclusion a document that mentions its own tag would appear in its own stream.
 - **The "Merged" badge** means a merge into some version of the document happened. It does not mean the post's text is still in the document, because later edits may have removed it.
 
