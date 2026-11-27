@@ -22,6 +22,16 @@ func (f *fakeHatcheck) archive(state string, hashes ...string) {
 	}
 }
 
+// legacyArchive records an unprefixed "archived" entry, as written before
+// the "deep:" prefix.
+func (f *fakeHatcheck) legacyArchive(state string, hashes ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, h := range hashes {
+		f.legacyArchiveLog = append(f.legacyArchiveLog, hatcheckclient.Relation{From: h, Rel: "archived", To: state})
+	}
+}
+
 func streamHashes(p pageResult) []string {
 	var hs []string
 	for _, post := range p.Stream {
@@ -215,8 +225,8 @@ func TestArchiveAndUnarchiveRecordARelation(t *testing.T) {
 		t.Fatalf("posted %d relations, want 2: %+v", len(f.posted), f.posted)
 	}
 	want := []hatcheckclient.Relation{
-		{From: "p002", Rel: "archived", To: "true"},
-		{From: "p002", Rel: "archived", To: "false"},
+		{From: "p002", Rel: "deep:archived", To: "true"},
+		{From: "p002", Rel: "deep:archived", To: "false"},
 	}
 	for i, w := range want {
 		if f.posted[i].From != w.From || f.posted[i].Rel != w.Rel || f.posted[i].To != w.To {
@@ -233,5 +243,31 @@ func TestArchiveRequiresAuth(t *testing.T) {
 	setArchivedHandler(svc, true).ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("status %d, want 401", rec.Code)
+	}
+}
+
+func TestLegacyArchivedRelationsStillHidePosts(t *testing.T) {
+	f := &fakeHatcheck{n: 10}
+	f.legacyArchive(notebook.ArchivedTrue, "p003", "p007")
+
+	_, p := getPage(t, f, "")
+	got := strings.Join(streamHashes(p), ",")
+	for _, h := range []string{"p003", "p007"} {
+		if strings.Contains(got, h) {
+			t.Errorf("%s was archived under the legacy predicate but is still shown", h)
+		}
+	}
+}
+
+// A prefixed entry is always newer than any legacy one, so it wins even
+// though the two predicates can't be ordered by the relation log itself.
+func TestPrefixedArchivedEntryOverridesLegacy(t *testing.T) {
+	f := &fakeHatcheck{n: 10}
+	f.legacyArchive(notebook.ArchivedTrue, "p003")
+	f.archive(notebook.ArchivedFalse, "p003")
+
+	_, p := getPage(t, f, "")
+	if !strings.Contains(strings.Join(streamHashes(p), ","), "p003") {
+		t.Error("p003 was unarchived under deep:archived after a legacy archive, so it should be shown")
 	}
 }

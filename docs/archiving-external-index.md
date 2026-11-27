@@ -30,7 +30,7 @@ The relation log is append-only, so every archive or unarchive toggle adds an en
 
 Keep the relation design. If notebook loads get slow, add a **derived in-memory cache** in Deep rather than a second store:
 
-1. On startup (or first load), read `GET /relations?rel=archived` once and reduce it to a set.
+1. On startup (or first load), read `GET /relations?rel=deep:archived` once and reduce it to a set.
 2. Update the set on every archive or unarchive write.
 3. Notebook loads then consult the set and never read the relation log.
 4. Optionally snapshot the set to a file for faster restarts. Losing it costs nothing, because it rebuilds from Hatcheck.

@@ -29,7 +29,12 @@ type fakeHatcheck struct {
 	// are appended to it, so a test can archive through Deep and read back.
 	mu         sync.Mutex
 	archiveLog []hatcheckclient.Relation
-	posted     []hatcheckclient.Relation // every relation posted, any predicate
+	// legacyArchiveLog is the unprefixed "archived" relations written before
+	// Deep adopted the "deep:" prefix; legacyPredicates makes the version
+	// relations come back under their old unprefixed names too.
+	legacyArchiveLog []hatcheckclient.Relation
+	legacyPredicates bool
+	posted           []hatcheckclient.Relation // every relation posted, any predicate
 }
 
 func (f *fakeHatcheck) hashes() []string {
@@ -72,19 +77,26 @@ func (f *fakeHatcheck) handler(w http.ResponseWriter, r *http.Request) {
 		if rel := q.Get("rel"); rel != "" && q.Get("hash") == "" {
 			f.mu.Lock()
 			out := []hatcheckclient.Relation{}
-			if rel == notebook.RelArchived {
+			switch rel {
+			case notebook.RelArchived:
 				out = append(out, f.archiveLog...)
+			case "archived":
+				out = append(out, f.legacyArchiveLog...)
 			}
 			f.mu.Unlock()
 			json.NewEncoder(w).Encode(map[string]any{"relations": out})
 			return
 		}
 		out := []hatcheckclient.Relation{}
+		supersedes, mergedFrom := notebook.RelSupersedes, notebook.RelMergedFrom
+		if f.legacyPredicates {
+			supersedes, mergedFrom = "supersedes", "merged-from"
+		}
 		if q.Get("hash") == f.docHash && f.oldVersion != "" {
-			out = append(out, hatcheckclient.Relation{From: f.docHash, Rel: "supersedes", To: f.oldVersion})
+			out = append(out, hatcheckclient.Relation{From: f.docHash, Rel: supersedes, To: f.oldVersion})
 		}
 		if q.Get("hash") == f.docHash {
-			out = append(out, hatcheckclient.Relation{From: f.docHash, Rel: "merged-from", To: "p002"})
+			out = append(out, hatcheckclient.Relation{From: f.docHash, Rel: mergedFrom, To: "p002"})
 		}
 		json.NewEncoder(w).Encode(map[string]any{"outgoing": out, "incoming": []any{}})
 	case "/fetch":
@@ -241,6 +253,23 @@ func TestPastVersionsExcludedAndMergedFlagged(t *testing.T) {
 	for _, post := range p.Stream {
 		if post.Hash == "p002" && !post.Merged {
 			t.Error("p002 should be flagged merged")
+		}
+	}
+}
+
+// Data written before the "deep:" prefix must keep working.
+func TestLegacyVersionPredicatesStillRead(t *testing.T) {
+	f := &fakeHatcheck{n: 6, docHash: "docv2", oldVersion: "docv1", legacyPredicates: true}
+	rec, p := getPage(t, f, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if p.Total != 6 {
+		t.Errorf("total = %d, want 6 (legacy supersedes should still hide the old version)", p.Total)
+	}
+	for _, post := range p.Stream {
+		if post.Hash == "p002" && !post.Merged {
+			t.Error("p002 should be flagged merged via a legacy merged-from relation")
 		}
 	}
 }

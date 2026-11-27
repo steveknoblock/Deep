@@ -53,9 +53,30 @@ type Post struct {
 // as they were), so it is reversible and applies to the post in every
 // notebook it appears in.
 const (
-	RelArchived   = "archived"
+	RelArchived   = "deep:archived"
 	ArchivedTrue  = "true"
 	ArchivedFalse = "false"
+)
+
+// Deep's other relation predicates. Hatcheck's relation index is one global
+// keyspace shared by every client of the store, so Deep's vocabulary carries
+// a "deep:" prefix to keep another app's "archived" (or similar) from being
+// read as Deep's.
+const (
+	RelSupersedes = "deep:supersedes"
+	RelMergedFrom = "deep:merged-from"
+)
+
+// Unprefixed predicates Deep wrote before the "deep:" prefix was adopted.
+// They are still read so existing data keeps working, but never written. For
+// archived state, legacy entries are replayed before prefixed ones: relations
+// carry no timestamp, so entries under different predicates can't be ordered
+// against each other, but every legacy entry was written before any prefixed
+// one, so replaying them in that order lets the newer entry win.
+const (
+	legacyRelArchived   = "archived"
+	legacyRelSupersedes = "supersedes"
+	legacyRelMergedFrom = "merged-from"
 )
 
 // View is the composed response for a tag: its current document (nil if
@@ -170,11 +191,11 @@ func (s *Service) resolveVersionInfo(ctx context.Context, auth hatcheckclient.Au
 	var info versionInfo
 	for _, r := range outgoing {
 		switch r.Rel {
-		case "supersedes":
+		case RelSupersedes, legacyRelSupersedes:
 			if info.predecessor == "" {
 				info.predecessor = r.To
 			}
-		case "merged-from":
+		case RelMergedFrom, legacyRelMergedFrom:
 			info.mergedFrom = append(info.mergedFrom, r.To)
 		}
 	}
@@ -344,10 +365,15 @@ func (s *Service) GetNotebook(ctx context.Context, auth hatcheckclient.AuthConte
 // order, so for each post the most recent entry decides: archived, then
 // unarchived, then archived again leaves it archived.
 func (s *Service) archivedPosts(ctx context.Context, auth hatcheckclient.AuthContext) (map[string]bool, error) {
-	rels, err := s.Hatcheck.RelationsByPredicate(ctx, auth, RelArchived)
+	legacy, err := s.Hatcheck.RelationsByPredicate(ctx, auth, legacyRelArchived)
 	if err != nil {
 		return nil, err
 	}
+	current, err := s.Hatcheck.RelationsByPredicate(ctx, auth, RelArchived)
+	if err != nil {
+		return nil, err
+	}
+	rels := append(legacy, current...)
 	archived := make(map[string]bool)
 	for _, r := range rels {
 		archived[r.From] = r.To == ArchivedTrue
@@ -438,7 +464,7 @@ func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthCont
 	}
 
 	if previousHash != "" {
-		if err := s.Hatcheck.CreateRelation(ctx, auth, stashed.Hash, "supersedes", previousHash); err != nil {
+		if err := s.Hatcheck.CreateRelation(ctx, auth, stashed.Hash, RelSupersedes, previousHash); err != nil {
 			// The document itself saved successfully — repointing the name
 			// already succeeded above — so this isn't fatal to the save.
 			// But without this relation, the old version will show up in
@@ -450,7 +476,7 @@ func (s *Service) SaveDocument(ctx context.Context, auth hatcheckclient.AuthCont
 	}
 
 	for _, sourceHash := range mergedHashes {
-		if err := s.Hatcheck.CreateRelation(ctx, auth, stashed.Hash, "merged-from", sourceHash); err != nil {
+		if err := s.Hatcheck.CreateRelation(ctx, auth, stashed.Hash, RelMergedFrom, sourceHash); err != nil {
 			// Same reasoning as above: the document itself saved fine, but
 			// this post won't show as merged until this relation exists.
 			return Document{Hash: stashed.Hash, Content: content},

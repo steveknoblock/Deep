@@ -773,7 +773,7 @@ function mergePost(hash) {
 }
 
 // Saves the document. Deep resolves the previous version, stashes the new
-// one, repoints notebook/<tag>, and records the supersedes relation, all in
+// one, repoints notebook/<tag>, and records the deep:supersedes relation, all in
 // one call — the client no longer tracks a doc hash or walks any chain.
 async function saveDocument() {
     if (!currentTag) return;
