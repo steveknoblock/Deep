@@ -53,7 +53,7 @@ func (f *fakeHatcheck) handler(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/names":
 		names := []map[string]string{}
-		if f.docHash != "" {
+		if f.docHash != "" && q.Get("namespace") == notebook.Namespace {
 			names = append(names, map[string]string{"label": "t", "hash": f.docHash})
 		}
 		json.NewEncoder(w).Encode(names)

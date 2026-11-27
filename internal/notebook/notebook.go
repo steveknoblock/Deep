@@ -1,7 +1,7 @@
 // Package notebook implements the Notebook application on top of Hatcheck's
 // generic primitives (stashes, tags, names, relations). Hatcheck itself has
 // no notion of a "document" or a "post" — those concepts, and the rules for
-// how they compose (a document is a post referenced by notebook/<tag>; a
+// how they compose (a document is a post referenced by deep/notebook/<tag>; a
 // version is superseded by writing a supersedes relation), live entirely
 // here, not in Hatcheck.
 package notebook
@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -18,8 +19,19 @@ import (
 )
 
 // Namespace is the Hatcheck name namespace used for notebook documents:
-// each tag's current document is notebook/<tag> in Hatcheck's NameIndex.
-const Namespace = "notebook"
+// each tag's current document is deep/notebook/<tag> in Hatcheck's NameIndex.
+// The "deep/" prefix makes the names identifiable as Deep's: Hatcheck's
+// namespace is only the part of a label before its first "/", so
+// GET /namespaces lists "deep", and a whole-namespace export of
+// "deep/notebook" selects exactly Deep's documents.
+const Namespace = "deep/notebook"
+
+// LegacyNamespace is where documents lived before Namespace was adopted
+// (notebook/<tag>). It is still read, so documents that haven't been saved
+// since keep working, but never written: saving a document writes its name
+// under Namespace, which moves that notebook over the next time it is saved.
+// A name under Namespace takes precedence over one under LegacyNamespace.
+const LegacyNamespace = "notebook"
 
 // Document is the current, editable text for a tag.
 type Document struct {
@@ -154,10 +166,41 @@ func NewService(hc *hatcheckclient.Client) *Service {
 	return &Service{Hatcheck: hc}
 }
 
+// documentNames returns every tag's current document name, reading Namespace
+// and LegacyNamespace and letting an entry under Namespace win over one for
+// the same tag under LegacyNamespace. The result is sorted case-insensitively
+// by label, the order Hatcheck gives a single namespace, so merging the two
+// doesn't change how notebooks are listed.
+func (s *Service) documentNames(ctx context.Context, auth hatcheckclient.AuthContext) ([]hatcheckclient.NameEntry, error) {
+	current, err := s.Hatcheck.Names(ctx, auth, Namespace)
+	if err != nil {
+		return nil, err
+	}
+	legacy, err := s.Hatcheck.Names(ctx, auth, LegacyNamespace)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(current))
+	merged := make([]hatcheckclient.NameEntry, 0, len(current)+len(legacy))
+	for _, n := range current {
+		seen[n.Label] = true
+		merged = append(merged, n)
+	}
+	for _, n := range legacy {
+		if !seen[n.Label] {
+			merged = append(merged, n)
+		}
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		return strings.ToLower(merged[i].Label) < strings.ToLower(merged[j].Label)
+	})
+	return merged, nil
+}
+
 // ListNotebooks returns every tag that currently has a document, preceded by
 // the always-present uncategorized tag.
 func (s *Service) ListNotebooks(ctx context.Context, auth hatcheckclient.AuthContext) ([]string, error) {
-	names, err := s.Hatcheck.Names(ctx, auth, Namespace)
+	names, err := s.documentNames(ctx, auth)
 	if err != nil {
 		return nil, fmt.Errorf("listing notebooks: %w", err)
 	}
@@ -232,10 +275,11 @@ func (s *Service) documentVersionChain(ctx context.Context, auth hatcheckclient.
 	return versions, merged, nil
 }
 
-// currentDocumentHash resolves notebook/<tag> to its current hash, or ""
-// if the tag has no document yet.
+// currentDocumentHash resolves deep/notebook/<tag> (or, failing that, the
+// legacy notebook/<tag>) to its current hash, or "" if the tag has no
+// document yet.
 func (s *Service) currentDocumentHash(ctx context.Context, auth hatcheckclient.AuthContext, tag string) (string, error) {
-	names, err := s.Hatcheck.Names(ctx, auth, Namespace)
+	names, err := s.documentNames(ctx, auth)
 	if err != nil {
 		return "", err
 	}
@@ -438,7 +482,7 @@ func (s *Service) fetchPost(ctx context.Context, auth hatcheckclient.AuthContext
 // SaveDocument writes content as the new document for tag: it resolves the
 // tag's current document itself (rather than trusting a client-supplied
 // "previous hash", which removes an entire class of client-side race),
-// stashes the new content, repoints notebook/<tag> at it, and — if a
+// stashes the new content, repoints deep/notebook/<tag> at it, and — if a
 // previous version existed — records a supersedes relation from the new
 // version back to it. mergedHashes are the post hashes the client actually
 // merged into this save (tracked client-side, since merging itself is a
