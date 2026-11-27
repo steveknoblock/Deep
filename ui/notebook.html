@@ -256,6 +256,26 @@
         .post-body {
             font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap;
         }
+        /* Collapsible YAML front matter (e.g. imported Apple Notes metadata) */
+        .post-fm { margin-bottom: 8px; }
+        .post-fm > summary {
+            display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+            font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+            color: var(--text-muted); list-style: none;
+        }
+        .post-fm > summary::-webkit-details-marker { display: none; }
+        .post-fm > summary::before {
+            content: '\25B8'; display: inline-block; width: 10px; font-size: 11px;
+            transition: transform 0.15s;
+        }
+        .post-fm[open] > summary::before { transform: rotate(90deg); }
+        .post-fm > summary:hover { color: var(--text); }
+        .post-fm-text {
+            margin: 6px 0 0; padding: 8px 10px; overflow-x: auto;
+            background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+            font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--text-dim);
+            white-space: pre-wrap; word-break: break-all;
+        }
         .post-failed { border-color: var(--danger); border-style: dashed; }
         .post-failed .post-date { color: var(--danger); }
         .post-body-failed { color: var(--text-muted); font-style: italic; }
@@ -605,9 +625,27 @@ function postHtml(p) {
                 <button class="post-archive" onclick="archivePost('${escAttr(p.hash)}', ${p.archived ? 'false' : 'true'}, this)">${p.archived ? 'Unarchive' : 'Archive'}</button>
                 <button class="post-merge" onclick="mergePost('${escAttr(p.hash)}')">Merge &rarr;</button>
             </div>
-            <div class="post-body">${escHtml(p.content)}</div>
+            ${postContentHtml(p.content)}
         </div>
     `;
+}
+
+// Splits leading YAML front matter (--- ... ---) off a post. Returns
+// { frontMatter, body }; frontMatter is null when the post doesn't start with
+// a closed front matter block. Display only — the stored post is unchanged.
+function splitFrontMatter(content) {
+    const m = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(content);
+    if (!m) return { frontMatter: null, body: content };
+    return { frontMatter: m[1] || '', body: content.slice(m[0].length).replace(/^(?:[ \t]*\r?\n)+/, '') };
+}
+
+// A post's body, with any YAML front matter tucked into a collapsed arrow.
+function postContentHtml(content) {
+    const { frontMatter, body } = splitFrontMatter(content);
+    if (frontMatter === null) return `<div class="post-body">${escHtml(content)}</div>`;
+    return `<details class="post-fm"><summary>Front matter</summary>`
+        + `<pre class="post-fm-text">${escHtml(frontMatter)}</pre></details>`
+        + (body ? `<div class="post-body">${escHtml(body)}</div>` : '');
 }
 
 // Archives or unarchives one post. Archiving is global — the post is hidden in
